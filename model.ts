@@ -214,7 +214,7 @@ export async function loadImageModel(options: {
 
   async function inferEmbeddingAsync(
     file_or_image_tensor: string | tf.Tensor,
-  ): Promise<tf.Tensor> {
+  ): Promise<tf.Tensor<tf.Rank>> {
     let inputs: tf.Tensor =
       typeof file_or_image_tensor == 'string'
         ? await loadImageAsync(file_or_image_tensor)
@@ -223,12 +223,12 @@ export async function loadImageModel(options: {
     if (typeof file_or_image_tensor == 'string') {
       inputs.dispose()
     }
-    return Array.isArray(outputs) ? outputs[0] : (outputs as tf.Tensor)
+    return Array.isArray(outputs) ? tf.concat(outputs) : (outputs as tf.Tensor)
   }
 
   function inferEmbeddingSync(
     file_or_image_tensor: string | tf.Tensor,
-  ): tf.Tensor {
+  ): tf.Tensor<tf.Rank> {
     let inputs: tf.Tensor =
       typeof file_or_image_tensor == 'string'
         ? loadImageSync(file_or_image_tensor)
@@ -237,7 +237,7 @@ export async function loadImageModel(options: {
     if (typeof file_or_image_tensor == 'string') {
       inputs.dispose()
     }
-    return Array.isArray(outputs) ? outputs[0] : (outputs as tf.Tensor)
+    return Array.isArray(outputs) ? tf.concat(outputs) : (outputs as tf.Tensor)
   }
 
   return {

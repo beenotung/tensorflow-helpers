@@ -73,16 +73,23 @@ export function cropAndResize(options: {
     const cropRight = 1 - cropLeft
     squareCrop = [[0, cropLeft, 1, cropRight]]
   }
-  // Expand image input dimensions to add a batch dimension of size 1.
-  let tensor4D =
-    imageTensor.shape.length == 4
-      ? (imageTensor as tf.Tensor4D)
-      : tf.expandDims<tf.Tensor4D>(imageTensor, 1)
-  const crop = tf.image.cropAndResize(
-    tensor4D,
-    squareCrop,
-    [0],
-    [width, height],
-  )
-  return crop.div<tf.Tensor4D>(255)
+  let result = tf.tidy(() => {
+    // Expand image input dimensions to add a batch dimension of size 1.
+    let tensor4D =
+      imageTensor.shape.length == 4
+        ? (imageTensor as tf.Tensor4D)
+        : tf.expandDims<tf.Tensor4D>(imageTensor, 1)
+    if (tensor4D != imageTensor) {
+      imageTensor.dispose()
+    }
+    const crop = tf.image.cropAndResize(
+      tensor4D,
+      squareCrop,
+      [0],
+      [width, height],
+    )
+    return crop.div<tf.Tensor4D>(255)
+  })
+  imageTensor.dispose()
+  return result
 }

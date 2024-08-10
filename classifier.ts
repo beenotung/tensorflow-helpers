@@ -109,26 +109,29 @@ export async function loadImageClassifierModel(options: {
   }
 
   async function loadDatasetFromDirectoryAsync() {
-    let x: tf.Tensor[] = []
-    let y: tf.Tensor[] = []
+    let xs: tf.Tensor[] = []
+    let class_indices: number[] = []
     for (let class_idx = 0; class_idx < classNames.length; class_idx++) {
-      let output = tf.oneHot(
-        tf.tensor1d([class_idx], 'int32'),
-        classNames.length,
-      )
       let dir = join(datasetDir, classNames[class_idx])
       let filenames = await readdir(dir)
       for (let filename of filenames) {
         let file = join(dir, filename)
         let embedding = await baseModel.inferEmbeddingAsync(file)
-        x.push(embedding)
-        y.push(output)
+        xs.push(embedding)
+        class_indices.push(class_idx)
       }
     }
-    return {
-      x: tf.concat(x),
-      y: tf.concat(y),
+
+    let x = tf.concat(xs)
+    for (let x of xs) {
+      x.dispose()
     }
+
+    let class_indices_tensor = tf.tensor1d(class_indices, 'int32')
+    let y = tf.oneHot(class_indices_tensor, classNames.length)
+    class_indices_tensor.dispose()
+
+    return { x, y }
   }
 
   async function trainAsync(options?: tf.ModelFitArgs): Promise<tf.History> {
