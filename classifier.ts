@@ -108,10 +108,13 @@ export async function loadImageClassifierModel(options: {
       compile()
     }
     let { x, y } = await loadDatasetFromDirectoryAsync()
-    return await classifierModel.fit(x, y, {
+    let history = await classifierModel.fit(x, y, {
       ...options,
       shuffle: true,
     })
+    x.dispose()
+    y.dispose()
+    return history
   }
 
   async function save(dir = classifierModelDir) {
