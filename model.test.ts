@@ -1,4 +1,4 @@
-import { baseModels, loadImageBaseModel } from './model'
+import { PreTrainedImageModels, loadImageModel } from './model'
 import { writeFile } from 'fs/promises'
 
 async function main() {
@@ -7,8 +7,8 @@ async function main() {
   let file = 'image.jpg'
   await writeFile(file, Buffer.from(buffer))
 
-  let baseModel = await loadImageBaseModel({
-    spec: baseModels.mobilenet['mobilenet-v3-large-100'],
+  let baseModel = await loadImageModel({
+    spec: PreTrainedImageModels.mobilenet['mobilenet-v3-large-100'],
     dir: 'saved_model/base_model',
   })
 

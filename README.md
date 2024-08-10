@@ -6,8 +6,11 @@ Helper functions to use tensorflow in nodejs / browser
 
 ## Features
 
+- Support transfer learning and continuous learning
+- Custom image classifier using embedding features from pre-trained image model
 - Correctly save/load model on filesystem[1]
 - Load image file into tensor with resize and crop
+- List varies pre-trained models (url, image dimension, embedding size)
 - Typescript support
 - Isomorphic package: works in Node.js and browsers
 - Works with plain Javascript, Typescript is not mandatory

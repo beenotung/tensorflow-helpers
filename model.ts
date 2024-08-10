@@ -64,6 +64,38 @@ export async function loadGraphModel(options: {
   return model
 }
 
+export async function loadLayersModel(options: {
+  dir: string
+}): Promise<tf.LayersModel> {
+  let { dir } = options
+  let model = await tf.loadLayersModel({
+    async load() {
+      let buffer = await readFile(join(dir, 'model.json'))
+      let modelArtifact: ModelArtifacts = JSON.parse(buffer.toString())
+      let weights = modelArtifact.weightData
+      if (!weights) {
+        throw new Error('missing weightData')
+      }
+      if (!Array.isArray(weights)) {
+        modelArtifact.weightData = await loadWeightData(
+          join(dir, `weight-0.bin`),
+        )
+        return modelArtifact
+      }
+      for (let i = 0; i < weights.length; i++) {
+        weights[i] = await loadWeightData(join(dir, `weight-${i}.bin`))
+      }
+      return modelArtifact
+    },
+  })
+  return model
+}
+
+async function loadWeightData(file: string) {
+  let buffer = await readFile(file)
+  return new Uint8Array(buffer)
+}
+
 export async function cachedLoadGraphModel(options: {
   url: string
   dir: string
@@ -77,7 +109,20 @@ export async function cachedLoadGraphModel(options: {
   return model
 }
 
-export type BaseModelSpec = {
+export async function cachedLoadLayersModel(options: {
+  url: string
+  dir: string
+}): Promise<Model> {
+  let { url: modelUrl, dir: modelDir } = options
+  if (existsSync(modelDir)) {
+    return await loadLayersModel(options)
+  }
+  let model = await tf.loadLayersModel(modelUrl, { fromTFHub: true })
+  await saveModel({ model, dir: modelDir })
+  return model
+}
+
+export type ImageModelSpec = {
   url: string
   width: number
   height: number
@@ -85,12 +130,32 @@ export type BaseModelSpec = {
   features: number
 }
 
-export const baseModels = {
+export const PreTrainedImageModels = {
   mobilenet: {
+    // #param, accuracy, and latency see: https://keras.io/api/applications/mobilenet/#mobilenetv3large-function
     'mobilenet-v3-large-100': {
       url: 'https://www.kaggle.com/models/google/mobilenet-v3/TfJs/large-100-224-feature-vector/1' as const,
-      version: 3 as const,
-      alpha: 1.0 as const,
+      width: 224 as const,
+      height: 224 as const,
+      channels: 3 as const,
+      features: 1280 as const,
+    },
+    'mobilenet-v3-large-75': {
+      url: 'https://www.kaggle.com/models/google/mobilenet-v3/TfJs/large-075-224-feature-vector/1' as const,
+      width: 224 as const,
+      height: 224 as const,
+      channels: 3 as const,
+      features: 1280 as const,
+    },
+    'mobilenet-v3-small-100': {
+      url: 'https://www.kaggle.com/models/google/mobilenet-v3/TfJs/small-100-224-feature-vector/1' as const,
+      width: 224 as const,
+      height: 224 as const,
+      channels: 3 as const,
+      features: 1280 as const,
+    },
+    'mobilenet-v3-small-75': {
+      url: 'https://www.kaggle.com/models/google/mobilenet-v3/TfJs/small-075-224-feature-vector/1' as const,
       width: 224 as const,
       height: 224 as const,
       channels: 3 as const,
@@ -99,10 +164,10 @@ export const baseModels = {
   },
 }
 
-export type ImageBaseModel = Awaited<ReturnType<typeof loadImageBaseModel>>
+export type ImageModel = Awaited<ReturnType<typeof loadImageModel>>
 
-export async function loadImageBaseModel(options: {
-  spec: BaseModelSpec
+export async function loadImageModel(options: {
+  spec: ImageModelSpec
   dir: string
 }) {
   let { spec, dir } = options
@@ -154,9 +219,7 @@ export async function loadImageBaseModel(options: {
       typeof file_or_image_tensor == 'string'
         ? await loadImageAsync(file_or_image_tensor)
         : file_or_image_tensor
-    let outputs = (model as tf.GraphModel).predictAsync
-      ? await (model as tf.GraphModel).predictAsync(inputs)
-      : model.predict(inputs)
+    let outputs = model.predict(inputs)
     if (typeof file_or_image_tensor == 'string') {
       inputs.dispose()
     }

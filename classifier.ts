@@ -1,23 +1,22 @@
-import { ImageBaseModel } from './model'
+import { ImageModel, loadLayersModel, saveModel } from './model'
 import * as tf from '@tensorflow/tfjs-node'
+import { readdirSync, existsSync } from 'fs'
 import { readdir } from 'fs/promises'
 import { join } from 'path'
 
-export async function createImageClassifier(options: {
-  baseModel: ImageBaseModel
+export type ClassifierModelSpec = {
+  embedding_features: number
   hidden_layers?: number[]
-  datasetDir: string
-  class_names?: string[]
-}) {
-  let { baseModel, hidden_layers, datasetDir } = options
+  classes: number
+}
 
-  let class_names = options.class_names || (await readdir(datasetDir))
+export function createImageClassifier(spec: ClassifierModelSpec) {
+  let { hidden_layers } = spec
 
   let classifierModel = tf.sequential()
   classifierModel.add(
-    tf.layers.inputLayer({ inputShape: [baseModel.spec.features] }),
+    tf.layers.inputLayer({ inputShape: [spec.embedding_features] }),
   )
-  classifierModel.add(tf.layers.globalAveragePooling1d())
   classifierModel.add(tf.layers.dropout({ rate: 0.2 }))
   if (hidden_layers) {
     for (let i = 0; i < hidden_layers.length; i++) {
@@ -27,8 +26,41 @@ export async function createImageClassifier(options: {
     }
   }
   classifierModel.add(
-    tf.layers.dense({ units: class_names.length, activation: 'softmax' }),
+    tf.layers.dense({ units: spec.classes, activation: 'softmax' }),
   )
+
+  return classifierModel
+}
+
+export async function loadImageClassifierModel(options: {
+  baseModel: ImageModel
+  hidden_layers?: number[]
+  classifierModelDir: string
+  datasetDir: string
+  class_names?: string[]
+}) {
+  let { baseModel, datasetDir, classifierModelDir } = options
+
+  let class_names = options.class_names || readdirSync(datasetDir)
+
+  let classifierModel = existsSync(classifierModelDir)
+    ? await loadLayersModel({ dir: classifierModelDir })
+    : createImageClassifier({
+        embedding_features: baseModel.spec.features,
+        hidden_layers: options.hidden_layers,
+        classes: class_names.length,
+      })
+
+  let compiled = false
+
+  function compile() {
+    compiled = true
+    classifierModel.compile({
+      optimizer: 'adam',
+      loss: tf.metrics.categoricalCrossentropy,
+      metrics: [tf.metrics.categoricalAccuracy],
+    })
+  }
 
   async function classifyAsync(
     file_or_image_tensor: string | tf.Tensor,
@@ -48,7 +80,7 @@ export async function createImageClassifier(options: {
     return Array.isArray(outputs) ? outputs[0] : (outputs as tf.Tensor)
   }
 
-  async function trainAsync(options: tf.ModelFitArgs): Promise<tf.History> {
+  async function loadDatasetFromDirectoryAsync() {
     let x: tf.Tensor[] = []
     let y: tf.Tensor[] = []
     for (let class_idx = 0; class_idx < class_names.length; class_idx++) {
@@ -56,7 +88,6 @@ export async function createImageClassifier(options: {
         tf.tensor1d([class_idx], 'int32'),
         class_names.length,
       )
-      tf.oneHot(tf.tensor1d([0, 1], 'float32'), 3)
       let dir = join(datasetDir, class_names[class_idx])
       let filenames = await readdir(dir)
       for (let filename of filenames) {
@@ -66,11 +97,37 @@ export async function createImageClassifier(options: {
         y.push(output)
       }
     }
+    return {
+      x: tf.concat(x),
+      y: tf.concat(y),
+    }
+  }
+
+  async function trainAsync(options?: tf.ModelFitArgs): Promise<tf.History> {
+    if (!compiled) {
+      compile()
+    }
+    let { x, y } = await loadDatasetFromDirectoryAsync()
     return await classifierModel.fit(x, y, {
       ...options,
       shuffle: true,
     })
   }
 
-  return { baseModel, classifierModel, classifyAsync, classifySync, trainAsync }
+  async function save(dir = classifierModelDir) {
+    return await saveModel({
+      model: classifierModel,
+      dir,
+    })
+  }
+
+  return {
+    baseModel,
+    classifierModel,
+    classifyAsync,
+    classifySync,
+    loadDatasetFromDirectoryAsync,
+    trainAsync,
+    save,
+  }
 }
