@@ -47,9 +47,9 @@ console.log('embedding features:', baseModel.spec.features)
 let classifier = await loadImageClassifierModel({
   baseModel,
   modelDir: 'saved_model/classifier_model',
-  hidden_layers: [128],
+  hiddenLayers: [128],
   datasetDir: 'dataset',
-  // class_names: ['anime', 'real'], // auto scan from datasetDir
+  // classNames: ['anime', 'real'], // auto scan from datasetDir
 })
 
 // auto load training dataset
@@ -116,9 +116,7 @@ export function saveModel(options: {
   dir: string
 }): Promise<SaveResult>
 
-export function loadGraphModel(options: {
-  dir: string
-}): Promise<tf.GraphModel>
+export function loadGraphModel(options: { dir: string }): Promise<tf.GraphModel>
 
 export function loadLayersModel(options: {
   dir: string
@@ -206,6 +204,71 @@ export function cropAndResize(options: {
 export function disposeTensor(tensor: tf.Tensor | tf.Tensor[]): void
 
 export function toOneTensor(tensor: tf.Tensor | tf.Tensor[]): tf.Tensor<tf.Rank>
+```
+
+</details>
+
+<details>
+<summary>Classifier helper functions</summary>
+
+```typescript
+export type ClassifierModelSpec = {
+  embeddingFeatures: number
+  hiddenLayers?: number[]
+  classes: number
+}
+
+export function createImageClassifier(spec: ClassifierModelSpec): tf.Sequential
+
+export type ClassificationResult = {
+  label: string
+  /**
+   * @description between 0 to 1. Also called probability or confidence
+   */
+  score: number
+}
+
+export type ClassifierModel = {
+  baseModel: {
+    spec: ImageModelSpec
+    model: Model
+    loadImageAsync: (file: string) => Promise<tf.Tensor4D>
+    loadImageSync: (file: string) => tf.Tensor4D
+    loadAnimatedImageAsync: (file: string) => Promise<tf.Tensor4D>
+    loadAnimatedImageSync: (file: string) => tf.Tensor4D
+    inferEmbeddingAsync: (
+      file_or_image_tensor: string | tf.Tensor,
+    ) => Promise<tf.Tensor>
+    inferEmbeddingSync: (file_or_image_tensor: string | tf.Tensor) => tf.Tensor
+  }
+  classifierModel: tf.LayersModel | tf.Sequential
+  classNames: string[]
+  classifyAsync: (
+    file_or_image_tensor: string | tf.Tensor,
+  ) => Promise<ClassificationResult[]>
+  classifySync: (
+    file_or_image_tensor: string | tf.Tensor,
+  ) => ClassificationResult[]
+  loadDatasetFromDirectoryAsync: () => Promise<{
+    x: tf.Tensor<tf.Rank>
+    y: tf.Tensor<tf.Rank>
+  }>
+  compile: () => void
+  trainAsync: (options?: tf.ModelFitArgs) => Promise<tf.History>
+  save: (dir?: string) => Promise<SaveResult>
+}
+
+export function loadImageClassifierModel(options: {
+  baseModel: ImageModel
+  hiddenLayers?: number[]
+  modelDir: string
+  datasetDir: string
+  classNames?: string[]
+}): Promise<ClassifierModel>
+
+export function topClassifyResult(
+  items: ClassificationResult[],
+): ClassificationResult
 ```
 
 </details>

@@ -15,9 +15,9 @@ async function main() {
   let classifier = await loadImageClassifierModel({
     baseModel,
     modelDir: 'saved_model/classifier_model',
-    hidden_layers: [128],
+    hiddenLayers: [128],
     datasetDir: 'dataset',
-    // class_names: ['anime', 'real'], // auto scan from datasetDir
+    // classNames: ['anime', 'real'], // auto scan from datasetDir
   })
   let history = await classifier.trainAsync({
     epochs: 5,

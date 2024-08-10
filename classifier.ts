@@ -6,23 +6,23 @@ import { join } from 'path'
 import { disposeTensor, toOneTensor } from './tensor'
 
 export type ClassifierModelSpec = {
-  embedding_features: number
-  hidden_layers?: number[]
+  embeddingFeatures: number
+  hiddenLayers?: number[]
   classes: number
 }
 
 export function createImageClassifier(spec: ClassifierModelSpec) {
-  let { hidden_layers } = spec
+  let { hiddenLayers } = spec
 
   let classifierModel = tf.sequential()
   classifierModel.add(
-    tf.layers.inputLayer({ inputShape: [spec.embedding_features] }),
+    tf.layers.inputLayer({ inputShape: [spec.embeddingFeatures] }),
   )
   classifierModel.add(tf.layers.dropout({ rate: 0.2 }))
-  if (hidden_layers) {
-    for (let i = 0; i < hidden_layers.length; i++) {
+  if (hiddenLayers) {
+    for (let i = 0; i < hiddenLayers.length; i++) {
       classifierModel.add(
-        tf.layers.dense({ units: hidden_layers[i], activation: 'gelu' }),
+        tf.layers.dense({ units: hiddenLayers[i], activation: 'gelu' }),
       )
     }
   }
@@ -47,21 +47,21 @@ export type ClassifierModel = Awaited<
 
 export async function loadImageClassifierModel(options: {
   baseModel: ImageModel
-  hidden_layers?: number[]
+  hiddenLayers?: number[]
   modelDir: string
   datasetDir: string
-  class_names?: string[]
+  classNames?: string[]
 }) {
   let { baseModel, datasetDir, modelDir } = options
 
-  let class_names = options.class_names || readdirSync(datasetDir)
+  let classNames = options.classNames || readdirSync(datasetDir)
 
   let classifierModel = existsSync(modelDir)
     ? await loadLayersModel({ dir: modelDir })
     : createImageClassifier({
-        embedding_features: baseModel.spec.features,
-        hidden_layers: options.hidden_layers,
-        classes: class_names.length,
+        embeddingFeatures: baseModel.spec.features,
+        hiddenLayers: options.hiddenLayers,
+        classes: classNames.length,
       })
 
   let compiled = false
@@ -98,10 +98,10 @@ export async function loadImageClassifierModel(options: {
   }
 
   function mapWithClassName(values: ArrayLike<number>): ClassificationResult[] {
-    let result = new Array(class_names.length)
-    for (let i = 0; i < class_names.length; i++) {
+    let result = new Array(classNames.length)
+    for (let i = 0; i < classNames.length; i++) {
       result[i] = {
-        label: class_names[i],
+        label: classNames[i],
         score: values[i],
       }
     }
@@ -111,12 +111,12 @@ export async function loadImageClassifierModel(options: {
   async function loadDatasetFromDirectoryAsync() {
     let x: tf.Tensor[] = []
     let y: tf.Tensor[] = []
-    for (let class_idx = 0; class_idx < class_names.length; class_idx++) {
+    for (let class_idx = 0; class_idx < classNames.length; class_idx++) {
       let output = tf.oneHot(
         tf.tensor1d([class_idx], 'int32'),
-        class_names.length,
+        classNames.length,
       )
-      let dir = join(datasetDir, class_names[class_idx])
+      let dir = join(datasetDir, classNames[class_idx])
       let filenames = await readdir(dir)
       for (let filename of filenames) {
         let file = join(dir, filename)
@@ -155,7 +155,7 @@ export async function loadImageClassifierModel(options: {
   return {
     baseModel,
     classifierModel,
-    class_names,
+    classNames,
     classifyAsync,
     classifySync,
     loadDatasetFromDirectoryAsync,
