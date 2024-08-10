@@ -1,5 +1,5 @@
-import { createImageClassifier, loadImageClassifierModel } from './classifier'
-import { PreTrainedImageModels, loadImageModel, saveModel } from './model'
+import { loadImageClassifierModel } from './classifier'
+import { PreTrainedImageModels, loadImageModel } from './model'
 
 async function main() {
   let baseModel = await loadImageModel({
