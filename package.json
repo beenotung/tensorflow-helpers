@@ -37,7 +37,16 @@
   "dependencies": {
     "@tensorflow/tfjs-node": "^4.20.0"
   },
+  "peerDependencies": {
+    "@tensorflow/tfjs-core": "^4.20.0"
+  },
+  "peerDependenciesMeta": {
+    "@tensorflow/tfjs-core": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@tensorflow/tfjs-core": "^4.20.0",
     "@types/node": "^22.1.0",
     "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
