@@ -3,6 +3,7 @@ import * as tf from '@tensorflow/tfjs-node'
 import { readdirSync, existsSync } from 'fs'
 import { readdir } from 'fs/promises'
 import { join } from 'path'
+import { disposeTensor, toOneTensor } from './tensor'
 
 export type ClassifierModelSpec = {
   embedding_features: number
@@ -32,19 +33,31 @@ export function createImageClassifier(spec: ClassifierModelSpec) {
   return classifierModel
 }
 
+export type ClassificationResult = {
+  label: string
+  /**
+   * @description between 0 to 1. Also called probability or confidence
+   */
+  score: number
+}
+
+export type ClassifierModel = Awaited<
+  ReturnType<typeof loadImageClassifierModel>
+>
+
 export async function loadImageClassifierModel(options: {
   baseModel: ImageModel
   hidden_layers?: number[]
-  classifierModelDir: string
+  modelDir: string
   datasetDir: string
   class_names?: string[]
 }) {
-  let { baseModel, datasetDir, classifierModelDir } = options
+  let { baseModel, datasetDir, modelDir } = options
 
   let class_names = options.class_names || readdirSync(datasetDir)
 
-  let classifierModel = existsSync(classifierModelDir)
-    ? await loadLayersModel({ dir: classifierModelDir })
+  let classifierModel = existsSync(modelDir)
+    ? await loadLayersModel({ dir: modelDir })
     : createImageClassifier({
         embedding_features: baseModel.spec.features,
         hidden_layers: options.hidden_layers,
@@ -64,20 +77,35 @@ export async function loadImageClassifierModel(options: {
 
   async function classifyAsync(
     file_or_image_tensor: string | tf.Tensor,
-  ): Promise<tf.Tensor> {
+  ): Promise<ClassificationResult[]> {
     let embedding = await baseModel.inferEmbeddingAsync(file_or_image_tensor)
-    return classifyAndDisposeEmbeddings(embedding)
-  }
-
-  function classifySync(file_or_image_tensor: string | tf.Tensor): tf.Tensor {
-    let embedding = baseModel.inferEmbeddingSync(file_or_image_tensor)
-    return classifyAndDisposeEmbeddings(embedding)
-  }
-
-  function classifyAndDisposeEmbeddings(embedding: tf.Tensor) {
     let outputs = classifierModel.predict(embedding)
     embedding.dispose()
-    return Array.isArray(outputs) ? outputs[0] : (outputs as tf.Tensor)
+    let values = await toOneTensor(outputs).data()
+    disposeTensor(outputs)
+    return mapWithClassName(values)
+  }
+
+  function classifySync(
+    file_or_image_tensor: string | tf.Tensor,
+  ): ClassificationResult[] {
+    let embedding = baseModel.inferEmbeddingSync(file_or_image_tensor)
+    let outputs = classifierModel.predict(embedding)
+    embedding.dispose()
+    let values = toOneTensor(outputs).dataSync()
+    disposeTensor(outputs)
+    return mapWithClassName(values)
+  }
+
+  function mapWithClassName(values: ArrayLike<number>): ClassificationResult[] {
+    let result = new Array(class_names.length)
+    for (let i = 0; i < class_names.length; i++) {
+      result[i] = {
+        label: class_names[i],
+        score: values[i],
+      }
+    }
+    return result
   }
 
   async function loadDatasetFromDirectoryAsync() {
@@ -117,7 +145,7 @@ export async function loadImageClassifierModel(options: {
     return history
   }
 
-  async function save(dir = classifierModelDir) {
+  async function save(dir = modelDir) {
     return await saveModel({
       model: classifierModel,
       dir,
@@ -127,10 +155,26 @@ export async function loadImageClassifierModel(options: {
   return {
     baseModel,
     classifierModel,
+    class_names,
     classifyAsync,
     classifySync,
     loadDatasetFromDirectoryAsync,
+    compile,
     trainAsync,
     save,
   }
+}
+
+export function topClassifyResult(
+  items: ClassificationResult[],
+): ClassificationResult {
+  let idx = 0
+  let max = items[idx]
+  for (let i = 1; i < items.length; i++) {
+    let item = items[i]
+    if (item.score > max.score) {
+      max = item
+    }
+  }
+  return max
 }

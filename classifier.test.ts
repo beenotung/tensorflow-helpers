@@ -1,4 +1,7 @@
-import { loadImageClassifierModel } from './classifier'
+import {
+  loadImageClassifierModel,
+  topClassifyResult as topClassificationResult,
+} from './classifier'
 import { PreTrainedImageModels, loadImageModel } from './model'
 
 async function main() {
@@ -6,12 +9,15 @@ async function main() {
     spec: PreTrainedImageModels.mobilenet['mobilenet-v3-large-100'],
     dir: 'saved_model/base_model',
   })
+  console.log('embedding features:', baseModel.spec.features)
+  // [print] embedding features: 1280
+
   let classifier = await loadImageClassifierModel({
     baseModel,
-    classifierModelDir: 'saved_model/classifier_model',
+    modelDir: 'saved_model/classifier_model',
+    hidden_layers: [128],
     datasetDir: 'dataset',
-    // class_names,
-    // hidden_layers,
+    // class_names: ['anime', 'real'], // auto scan from datasetDir
   })
   let history = await classifier.trainAsync({
     epochs: 5,
@@ -20,5 +26,11 @@ async function main() {
   // console.log('history:', history)
 
   await classifier.save()
+
+  let classes = await classifier.classifyAsync('image.jpg')
+  let topClass = topClassificationResult(classes)
+
+  console.log('result:', topClass)
+  // [print] result: { label: 'anime', score: 0.7991582155227661 }
 }
 main().catch(e => console.error(e))
