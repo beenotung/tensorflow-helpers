@@ -58,10 +58,10 @@ let history = await classifier.trainAsync({
   batchSize: 32,
 })
 
-// to persist the parameters across restart
+// persist the parameters across restart
 await classifier.save()
 
-// auto load from filesystem, resize and crop
+// auto load image from filesystem, resize and crop
 let classes = await classifier.classifyAsync('image.jpg')
 let topClass = topClassificationResult(classes)
 
