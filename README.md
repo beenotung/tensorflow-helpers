@@ -1,6 +1,6 @@
 # tensorflow-helpers
 
-Helper functions to use tensorflow in nodejs
+Helper functions to use tensorflow in nodejs for transfer learning, image classification, and more
 
 [![npm Package Version](https://img.shields.io/npm/v/tensorflow-helpers)](https://www.npmjs.com/package/tensorflow-helpers)
 
