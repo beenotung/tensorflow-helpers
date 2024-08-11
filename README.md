@@ -66,7 +66,7 @@ let classes = await classifier.classifyAsync('image.jpg')
 let topClass = topClassificationResult(classes)
 
 console.log('result:', topClass)
-// [print] result: { label: 'anime', score: 0.7991582155227661 }
+// [print] result: { label: 'anime', confidence: 0.7991582155227661 }
 ```
 
 ## Typescript Signature
@@ -222,10 +222,8 @@ export function createImageClassifier(spec: ClassifierModelSpec): tf.Sequential
 
 export type ClassificationResult = {
   label: string
-  /**
-   * @description between 0 to 1. Also called probability or confidence
-   */
-  score: number
+  /** @description between 0 to 1 */
+  confidence: number
 }
 
 export type ClassifierModel = {

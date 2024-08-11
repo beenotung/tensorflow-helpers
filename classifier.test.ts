@@ -31,6 +31,6 @@ async function main() {
   let topClass = topClassificationResult(classes)
 
   console.log('result:', topClass)
-  // [print] result: { label: 'anime', score: 0.7991582155227661 }
+  // [print] result: { label: 'anime', confidence: 0.7991582155227661 }
 }
 main().catch(e => console.error(e))

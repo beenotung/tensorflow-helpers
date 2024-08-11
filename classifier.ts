@@ -35,10 +35,8 @@ export function createImageClassifier(spec: ClassifierModelSpec) {
 
 export type ClassificationResult = {
   label: string
-  /**
-   * @description between 0 to 1. Also called probability or confidence
-   */
-  score: number
+  /** @description between 0 to 1 */
+  confidence: number
 }
 
 export type ClassifierModel = Awaited<
@@ -102,7 +100,7 @@ export async function loadImageClassifierModel(options: {
     for (let i = 0; i < classNames.length; i++) {
       result[i] = {
         label: classNames[i],
-        score: values[i],
+        confidence: values[i],
       }
     }
     return result
@@ -175,7 +173,7 @@ export function topClassifyResult(
   let max = items[idx]
   for (let i = 1; i < items.length; i++) {
     let item = items[i]
-    if (item.score > max.score) {
+    if (item.confidence > max.confidence) {
       max = item
     }
   }
