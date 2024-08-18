@@ -1,4 +1,4 @@
-import { readFile } from 'fs/promises'
+import { readFile, writeFile } from 'fs/promises'
 import * as tf from '@tensorflow/tfjs-node'
 import { readFileSync } from 'fs'
 
@@ -92,4 +92,25 @@ export function cropAndResize(options: {
   })
   imageTensor.dispose()
   return result
+}
+
+export async function cropAndResizeImageFileAsync(options: {
+  srcFile: string
+  destFile: string
+  width: number
+  height: number
+}): Promise<void> {
+  let imageTensor = await loadImageFileAsync(options.srcFile)
+  let tensor3D = tf.tidy(() =>
+    tf.squeeze<tf.Tensor3D>(
+      cropAndResize({
+        imageTensor,
+        width: options.width,
+        height: options.height,
+      }),
+    ),
+  )
+  let buffer = Buffer.from(await tf.node.encodeJpeg(tensor3D))
+  tensor3D.dispose()
+  await writeFile(options.destFile, buffer)
 }

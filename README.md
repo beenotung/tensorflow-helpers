@@ -193,6 +193,13 @@ export function cropAndResize(options: {
   width: number
   height: number
 }): tf.Tensor4D
+
+export function cropAndResizeImageFileAsync(options: {
+  srcFile: string
+  destFile: string
+  width: number
+  height: number
+}): Promise<void>
 ```
 
 </details>
