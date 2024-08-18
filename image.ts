@@ -78,7 +78,7 @@ export function cropAndResize(options: {
     let tensor4D =
       imageTensor.shape.length == 4
         ? (imageTensor as tf.Tensor4D)
-        : tf.expandDims<tf.Tensor4D>(imageTensor, 1)
+        : tf.expandDims<tf.Tensor4D>(imageTensor, 0)
     if (tensor4D != imageTensor) {
       imageTensor.dispose()
     }
@@ -102,13 +102,13 @@ export async function cropAndResizeImageFileAsync(options: {
 }): Promise<void> {
   let imageTensor = await loadImageFileAsync(options.srcFile)
   let tensor3D = tf.tidy(() =>
-    tf.squeeze<tf.Tensor3D>(
-      cropAndResize({
-        imageTensor,
-        width: options.width,
-        height: options.height,
-      }),
-    ),
+    cropAndResize({
+      imageTensor,
+      width: options.width,
+      height: options.height,
+    })
+      .squeeze<tf.Tensor3D>([0])
+      .mul<tf.Tensor3D>(255),
   )
   let buffer = Buffer.from(await tf.node.encodeJpeg(tensor3D))
   tensor3D.dispose()
