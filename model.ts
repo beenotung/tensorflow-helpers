@@ -2,7 +2,12 @@ import * as tf from '@tensorflow/tfjs-node'
 import { existsSync, mkdirSync } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
-import { cropAndResize, loadImageFileAsync, loadImageFileSync } from './image'
+import {
+  CropAndResizeAspectRatio,
+  cropAndResize,
+  loadImageFileAsync,
+  loadImageFileSync,
+} from './image'
 
 export type IOHandler = Exclude<Parameters<tf.GraphModel['save']>[0], string>
 export type ModelArtifacts = Parameters<Required<IOHandler>['save']>[0]
@@ -169,8 +174,9 @@ export type ImageModel = Awaited<ReturnType<typeof loadImageModel>>
 export async function loadImageModel(options: {
   spec: ImageModelSpec
   dir: string
+  aspectRatio?: CropAndResizeAspectRatio
 }) {
-  let { spec, dir } = options
+  let { spec, dir, aspectRatio } = options
   let { url, width, height, channels } = spec
 
   let model = await cachedLoadGraphModel({
@@ -183,7 +189,12 @@ export async function loadImageModel(options: {
       channels,
       expandAnimations: false,
     })
-    imageTensor = cropAndResize({ imageTensor, width, height })
+    imageTensor = cropAndResize({
+      imageTensor,
+      width,
+      height,
+      aspectRatio,
+    })
     return imageTensor
   }
 
@@ -192,7 +203,12 @@ export async function loadImageModel(options: {
       channels,
       expandAnimations: false,
     })
-    return cropAndResize({ imageTensor, width, height })
+    return cropAndResize({
+      imageTensor,
+      width,
+      height,
+      aspectRatio,
+    })
   }
 
   async function loadAnimatedImageAsync(file: string): Promise<tf.Tensor4D> {
@@ -200,7 +216,12 @@ export async function loadImageModel(options: {
       channels,
       expandAnimations: true,
     })
-    return cropAndResize({ imageTensor, width, height })
+    return cropAndResize({
+      imageTensor,
+      width,
+      height,
+      aspectRatio,
+    })
   }
 
   function loadAnimatedImageSync(file: string): tf.Tensor4D {
@@ -208,7 +229,12 @@ export async function loadImageModel(options: {
       channels,
       expandAnimations: true,
     })
-    imageTensor = cropAndResize({ imageTensor, width, height })
+    imageTensor = cropAndResize({
+      imageTensor,
+      width,
+      height,
+      aspectRatio,
+    })
     return imageTensor
   }
 
