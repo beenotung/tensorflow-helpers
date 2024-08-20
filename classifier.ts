@@ -103,17 +103,28 @@ export async function loadImageClassifierModel(options: {
     let classIndices: number[] = []
     let classCounts: number[] = new Array(classNames.length).fill(0)
 
-    for (let class_idx = 0; class_idx < classNames.length; class_idx++) {
-      let dir = join(datasetDir, classNames[class_idx])
-      let filenames = await readdir(dir)
+    let total = 0
+    let classes = await Promise.all(
+      classNames.map(async (className, classIdx) => {
+        let dir = join(datasetDir, className)
+        let filenames = await readdir(dir)
+        total += filenames.length
+        return { classIdx, dir, filenames }
+      }),
+    )
+
+    let i = 0
+    for (let { classIdx, dir, filenames } of classes) {
       for (let filename of filenames) {
+        process.stderr.write(`\rload dataset: ${++i}/${total}`)
         let file = join(dir, filename)
         let embedding = await baseModel.inferEmbeddingAsync(file, options)
         xs.push(embedding)
-        classIndices.push(class_idx)
-        classCounts[class_idx]++
+        classIndices.push(classIdx)
+        classCounts[classIdx]++
       }
     }
+    process.stderr.write('\n')
 
     let x = tf.concat(xs)
 
