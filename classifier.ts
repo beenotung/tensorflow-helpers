@@ -112,13 +112,16 @@ export async function loadImageClassifierModel(options: {
     }
 
     let x = tf.concat(xs)
-    for (let x of xs) {
-      x.dispose()
+
+    if (!options.cache) {
+      for (let x of xs) {
+        x.dispose()
+      }
     }
 
-    let class_indices_tensor = tf.tensor1d(class_indices, 'int32')
-    let y = tf.oneHot(class_indices_tensor, classNames.length)
-    class_indices_tensor.dispose()
+    let y = tf.tidy(() =>
+      tf.oneHot(tf.tensor1d(class_indices, 'int32'), classNames.length),
+    )
 
     return { x, y }
   }
