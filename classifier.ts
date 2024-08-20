@@ -81,7 +81,7 @@ export async function loadImageClassifierModel(options: {
     embedding.dispose()
     let values = await toOneTensor(outputs).data()
     disposeTensor(outputs)
-    return mapWithClassName(values)
+    return mapWithClassName(classNames, values)
   }
 
   function classifySync(
@@ -92,18 +92,7 @@ export async function loadImageClassifierModel(options: {
     embedding.dispose()
     let values = toOneTensor(outputs).dataSync()
     disposeTensor(outputs)
-    return mapWithClassName(values)
-  }
-
-  function mapWithClassName(values: ArrayLike<number>): ClassificationResult[] {
-    let result = new Array(classNames.length)
-    for (let i = 0; i < classNames.length; i++) {
-      result[i] = {
-        label: classNames[i],
-        confidence: values[i],
-      }
-    }
-    return result
+    return mapWithClassName(classNames, values)
   }
 
   async function loadDatasetFromDirectoryAsync() {
@@ -198,4 +187,28 @@ export function topClassifyResult(
     }
   }
   return max
+}
+
+/**
+ * @description the values is returned as is.
+ * It should has be applied softmax already.
+ * */
+export function mapWithClassName(
+  classNames: string[],
+  values: ArrayLike<number>,
+  options?: {
+    sort?: boolean
+  },
+): ClassificationResult[] {
+  let result = new Array(classNames.length)
+  for (let i = 0; i < classNames.length; i++) {
+    result[i] = {
+      label: classNames[i],
+      confidence: values[i],
+    }
+  }
+  if (options?.sort) {
+    result.sort((a, b) => b.confidence - a.confidence)
+  }
+  return result
 }

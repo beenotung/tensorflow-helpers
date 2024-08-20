@@ -274,6 +274,18 @@ export function loadImageClassifierModel(options: {
 export function topClassifyResult(
   items: ClassificationResult[],
 ): ClassificationResult
+
+/**
+ * @description the values is returned as is.
+ * It should has be applied softmax already
+ * */
+export function mapWithClassName(
+  classNames: string[],
+  values: ArrayLike<number>,
+  options?: {
+    sort?: boolean
+  },
+): ClassificationResult[]
 ```
 
 </details>
