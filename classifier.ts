@@ -114,9 +114,14 @@ export async function loadImageClassifierModel(options: {
     )
 
     let i = 0
+    let nextI = 0
     for (let { classIdx, dir, filenames } of classes) {
       for (let filename of filenames) {
-        process.stderr.write(`\rload dataset: ${++i}/${total}`)
+        i++
+        if (i >= nextI) {
+          process.stderr.write(`\rload dataset: ${i}/${total}`)
+          nextI += total / 100
+        }
         let file = join(dir, filename)
         let embedding = await baseModel.inferEmbeddingAsync(file, options)
         xs.push(embedding)
@@ -124,7 +129,7 @@ export async function loadImageClassifierModel(options: {
         classCounts[classIdx]++
       }
     }
-    process.stderr.write('\n')
+    process.stderr.write(`\rload dataset: ${++i}/${total}\n`)
 
     let x = tf.concat(xs)
 
