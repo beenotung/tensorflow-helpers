@@ -129,7 +129,7 @@ export async function loadImageClassifierModel(options: {
         classCounts[classIdx]++
       }
     }
-    process.stderr.write(`\rload dataset: ${++i}/${total}\n`)
+    process.stderr.write(`\rload dataset: ${i}/${total}\n`)
 
     let x = tf.concat(xs)
 
