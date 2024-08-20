@@ -132,17 +132,37 @@ export async function loadImageClassifierModel(options: {
     return { x, y }
   }
 
-  async function trainAsync(options?: tf.ModelFitArgs): Promise<tf.History> {
+  async function trainAsync(
+    options?: tf.ModelFitArgs &
+      (
+        | {
+            x: tf.Tensor<tf.Rank>
+            y: tf.Tensor<tf.Rank>
+          }
+        | {}
+      ),
+  ): Promise<tf.History> {
     if (!compiled) {
       compile()
     }
-    let { x, y } = await loadDatasetFromDirectoryAsync()
+    var x: tf.Tensor<tf.Rank>
+    var y: tf.Tensor<tf.Rank>
+    let loadedDataset = false
+    if (options && 'x' in options && 'y' in options) {
+      var { x, y, ...rest } = options
+      options = rest
+    } else {
+      var { x, y } = await loadDatasetFromDirectoryAsync()
+      loadedDataset = true
+    }
     let history = await classifierModel.fit(x, y, {
       ...options,
       shuffle: true,
     })
-    x.dispose()
-    y.dispose()
+    if (loadedDataset) {
+      x.dispose()
+      y.dispose()
+    }
     return history
   }
 

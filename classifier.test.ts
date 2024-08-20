@@ -19,11 +19,22 @@ async function main() {
     datasetDir: 'dataset',
     // classNames: ['anime', 'real'], // auto scan from datasetDir
   })
+  let { x, y } = await classifier.loadDatasetFromDirectoryAsync()
   let history = await classifier.trainAsync({
+    x,
+    y,
     epochs: 5,
     batchSize: 32,
   })
   // console.log('history:', history)
+
+  // reuse the encoded image dataset
+  await classifier.trainAsync({
+    x,
+    y,
+    epochs: 5,
+    batchSize: 32,
+  })
 
   await classifier.save()
 
