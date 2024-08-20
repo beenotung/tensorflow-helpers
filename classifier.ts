@@ -4,6 +4,7 @@ import { readdirSync, existsSync } from 'fs'
 import { readdir } from 'fs/promises'
 import { join } from 'path'
 import { disposeTensor, toOneTensor } from './tensor'
+import { ClassWeight, ClassWeightMap } from '@tensorflow/tfjs-node'
 
 export type ClassifierModelSpec = {
   embeddingFeatures: number
@@ -135,6 +136,8 @@ export async function loadImageClassifierModel(options: {
         | {
             x: tf.Tensor<tf.Rank>
             y: tf.Tensor<tf.Rank>
+            /** @description to calculate classWeight */
+            classCounts?: number[]
           }
         | {}
       ),
@@ -142,25 +145,43 @@ export async function loadImageClassifierModel(options: {
     if (!compiled) {
       compile()
     }
-    var x: tf.Tensor<tf.Rank>
-    var y: tf.Tensor<tf.Rank>
-    let loadedDataset = false
-    if (options && 'x' in options && 'y' in options) {
-      var { x, y, ...rest } = options
-      options = rest
-    } else {
-      var { x, y } = await loadDatasetFromDirectoryAsync()
-      loadedDataset = true
+    let next = async (
+      x: tf.Tensor<tf.Rank>,
+      y: tf.Tensor<tf.Rank>,
+      classWeight?: ClassWeight | ClassWeight[] | ClassWeightMap,
+    ) => {
+      let history = await classifierModel.fit(x, y, {
+        ...options,
+        shuffle: true,
+        classWeight,
+      })
+      return history
     }
-    let history = await classifierModel.fit(x, y, {
-      ...options,
-      shuffle: true,
-    })
-    if (loadedDataset) {
+    if (options && 'x' in options && 'y' in options) {
+      let { x, y, classCounts, ...rest } = options
+      options = rest
+      let classWeight =
+        options.classWeight ||
+        (classCounts
+          ? calcClassWeight({
+              classes: classNames.length,
+              classCounts,
+            })
+          : undefined)
+      return next(x, y, classWeight)
+    } else {
+      let { x, y, classCounts } = await loadDatasetFromDirectoryAsync()
+      let classWeight =
+        options?.classWeight ||
+        calcClassWeight({
+          classes: classNames.length,
+          classCounts,
+        })
+      let history = await next(x, y, classWeight)
       x.dispose()
       y.dispose()
+      return history
     }
-    return history
   }
 
   async function save(dir = modelDir) {
@@ -219,4 +240,15 @@ export function mapWithClassName(
     result.sort((a, b) => b.confidence - a.confidence)
   }
   return result
+}
+
+export function calcClassWeight(options: {
+  classes: number
+  classCounts: number[]
+}) {
+  let total = options.classCounts.reduce((acc, c) => acc + c, 0)
+  let classWeights = options.classCounts.map(
+    count => total / options.classes / count,
+  )
+  return classWeights
 }
