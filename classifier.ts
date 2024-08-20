@@ -95,7 +95,9 @@ export async function loadImageClassifierModel(options: {
     return mapWithClassName(classNames, values)
   }
 
-  async function loadDatasetFromDirectoryAsync() {
+  async function loadDatasetFromDirectoryAsync(
+    options: { cache?: boolean } = {},
+  ) {
     let xs: tf.Tensor[] = []
     let class_indices: number[] = []
     for (let class_idx = 0; class_idx < classNames.length; class_idx++) {
@@ -103,7 +105,7 @@ export async function loadImageClassifierModel(options: {
       let filenames = await readdir(dir)
       for (let filename of filenames) {
         let file = join(dir, filename)
-        let embedding = await baseModel.inferEmbeddingAsync(file)
+        let embedding = await baseModel.inferEmbeddingAsync(file, options)
         xs.push(embedding)
         class_indices.push(class_idx)
       }

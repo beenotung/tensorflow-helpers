@@ -238,32 +238,63 @@ export async function loadImageModel(options: {
     return imageTensor
   }
 
+  let fileEmbeddingCache = new Map<string, tf.Tensor<tf.Rank>>()
+
   async function inferEmbeddingAsync(
     file_or_image_tensor: string | tf.Tensor,
+    options: { cache?: boolean } = {},
   ): Promise<tf.Tensor<tf.Rank>> {
+    /* check cache */
+    if (options.cache && typeof file_or_image_tensor == 'string') {
+      let embedding = fileEmbeddingCache.get(file_or_image_tensor)
+      if (embedding) return embedding
+    }
+
     let inputs: tf.Tensor =
       typeof file_or_image_tensor == 'string'
         ? await loadImageAsync(file_or_image_tensor)
         : file_or_image_tensor
-    let outputs = model.predict(inputs)
-    if (typeof file_or_image_tensor == 'string') {
-      inputs.dispose()
-    }
-    return Array.isArray(outputs) ? tf.concat(outputs) : (outputs as tf.Tensor)
+
+    return inferHelper(file_or_image_tensor, options, inputs)
   }
 
   function inferEmbeddingSync(
     file_or_image_tensor: string | tf.Tensor,
+    options: { cache?: boolean } = {},
   ): tf.Tensor<tf.Rank> {
+    /* check cache */
+    if (options.cache && typeof file_or_image_tensor == 'string') {
+      let embedding = fileEmbeddingCache.get(file_or_image_tensor)
+      if (embedding) return embedding
+    }
+
     let inputs: tf.Tensor =
       typeof file_or_image_tensor == 'string'
         ? loadImageSync(file_or_image_tensor)
         : file_or_image_tensor
+
+    return inferHelper(file_or_image_tensor, options, inputs)
+  }
+
+  function inferHelper(
+    file_or_image_tensor: string | tf.Tensor,
+    options: { cache?: boolean },
+    inputs: tf.Tensor,
+  ) {
     let outputs = model.predict(inputs)
     if (typeof file_or_image_tensor == 'string') {
       inputs.dispose()
     }
-    return Array.isArray(outputs) ? tf.concat(outputs) : (outputs as tf.Tensor)
+    let embedding = Array.isArray(outputs)
+      ? tf.concat(outputs)
+      : (outputs as tf.Tensor)
+
+    /* update cache */
+    if (options.cache && typeof file_or_image_tensor == 'string') {
+      fileEmbeddingCache.set(file_or_image_tensor, embedding)
+    }
+
+    return embedding
   }
 
   return {
@@ -273,6 +304,7 @@ export async function loadImageModel(options: {
     loadImageSync,
     loadAnimatedImageAsync,
     loadAnimatedImageSync,
+    fileEmbeddingCache,
     inferEmbeddingAsync,
     inferEmbeddingSync,
   }
