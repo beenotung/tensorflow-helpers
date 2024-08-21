@@ -12,7 +12,7 @@ async function main() {
     dir: 'saved_model/base_model',
   })
 
-  let embedding = await baseModel.inferEmbeddingAsync(file)
+  let embedding = await baseModel.imageFileToEmbedding(file)
 
   console.log(embedding)
 }

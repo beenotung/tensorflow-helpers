@@ -42,6 +42,7 @@ export function hashContent(content: Buffer, encoding: BufferEncoding = 'hex') {
   return hash.digest().toString(encoding)
 }
 
+/** @returns new filename with content hash and extname */
 export async function renameFileByContentHash(file: string) {
   let dir = dirname(file)
   let filename = basename(file)

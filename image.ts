@@ -1,8 +1,34 @@
 import { readFile, writeFile } from 'fs/promises'
 import * as tf from '@tensorflow/tfjs-node'
-import { readFileSync } from 'fs'
+import { toTensor3D, toTensor4D } from './tensor'
 
-export async function loadImageFileAsync(
+export async function loadImageFile(
+  file: string,
+  options?: {
+    channels?: number
+    dtype?: string
+    expandAnimations?: false
+    crop?: {
+      width: number
+      height: number
+      aspectRatio?: CropAndResizeAspectRatio
+    }
+  },
+): Promise<tf.Tensor3D>
+export async function loadImageFile(
+  file: string,
+  options?: {
+    channels?: number
+    dtype?: string
+    expandAnimations?: boolean
+    crop?: {
+      width: number
+      height: number
+      aspectRatio?: CropAndResizeAspectRatio
+    }
+  },
+): Promise<tf.Tensor3D | tf.Tensor4D>
+export async function loadImageFile(
   file: string,
   options?: {
     channels?: number
@@ -15,57 +41,24 @@ export async function loadImageFileAsync(
     }
   },
 ): Promise<tf.Tensor3D | tf.Tensor4D> {
-  let buffer = await readFile(file)
+  let content = await readFile(file)
   let tensor = options
     ? tf.node.decodeImage(
-        buffer,
+        content,
         options.channels,
         options.dtype,
-        options.expandAnimations,
+        options.expandAnimations ?? false,
       )
-    : tf.node.decodeImage(buffer)
+    : tf.node.decodeImage(content)
   if (options?.crop) {
-    tensor = cropAndResize({
+    tensor = cropAndResizeImageTensor({
       imageTensor: tensor,
       width: options.crop.width,
       height: options.crop.height,
       aspectRatio: options.crop.aspectRatio,
     })
   }
-  return tensor as tf.Tensor3D
-}
-
-export function loadImageFileSync(
-  file: string,
-  options?: {
-    channels?: number
-    dtype?: string
-    expandAnimations?: boolean
-    crop?: {
-      width: number
-      height: number
-      aspectRatio?: CropAndResizeAspectRatio
-    }
-  },
-): tf.Tensor3D | tf.Tensor4D {
-  let buffer = readFileSync(file)
-  let tensor = options
-    ? tf.node.decodeImage(
-        buffer,
-        options.channels,
-        options.dtype,
-        options.expandAnimations,
-      )
-    : tf.node.decodeImage(buffer)
-  if (options?.crop) {
-    tensor = cropAndResize({
-      imageTensor: tensor,
-      width: options.crop.width,
-      height: options.crop.height,
-      aspectRatio: options.crop.aspectRatio,
-    })
-  }
-  return tensor as tf.Tensor3D
+  return tensor
 }
 
 export function getImageTensorShape(imageTensor: tf.Tensor3D | tf.Tensor4D) {
@@ -128,7 +121,7 @@ export function calcCropBox(options: {
  */
 export type CropAndResizeAspectRatio = 'rescale' | 'center-crop'
 
-export function cropAndResize(options: {
+export function cropAndResizeImageTensor(options: {
   imageTensor: tf.Tensor3D | tf.Tensor4D
   width: number
   height: number
@@ -136,7 +129,6 @@ export function cropAndResize(options: {
 }): tf.Tensor4D {
   let { imageTensor, width, height } = options
   let croppedImageTensor = tf.tidy(() => {
-    // Expand image input dimensions to add a batch dimension of size 1.
     let imageShape = getImageTensorShape(imageTensor)
     let cropBox: Box =
       options.aspectRatio != 'center-crop'
@@ -145,12 +137,9 @@ export function cropAndResize(options: {
             sourceShape: imageShape,
             targetShape: { width, height },
           })
-    let tensor4D =
-      imageTensor.shape.length == 4
-        ? (imageTensor as tf.Tensor4D)
-        : tf.expandDims<tf.Tensor4D>(imageTensor, 0)
     const crop = tf.image.cropAndResize(
-      tensor4D,
+      // Expand image input dimensions to add a batch dimension of size 1.
+      toTensor4D(imageTensor),
       [cropBox],
       [0],
       [height, width],
@@ -161,25 +150,22 @@ export function cropAndResize(options: {
   return croppedImageTensor
 }
 
-export async function cropAndResizeImageFileAsync(options: {
+export async function cropAndResizeImageFile(options: {
   srcFile: string
   destFile: string
   width: number
   height: number
   aspectRatio?: CropAndResizeAspectRatio
 }): Promise<void> {
-  let imageTensor = await loadImageFileAsync(options.srcFile)
-  let tensor3D = tf.tidy(() =>
-    cropAndResize({
-      imageTensor,
+  let imageTensor = await loadImageFile(options.srcFile, {
+    crop: {
       width: options.width,
       height: options.height,
       aspectRatio: options.aspectRatio,
-    })
-      .squeeze<tf.Tensor3D>([0])
-      .mul<tf.Tensor3D>(255),
-  )
-  let buffer = Buffer.from(await tf.node.encodeJpeg(tensor3D))
+    },
+  })
+  let tensor3D = tf.tidy(() => toTensor3D(imageTensor).mul<tf.Tensor3D>(255))
+  let content = await tf.node.encodeJpeg(tensor3D)
   tensor3D.dispose()
-  await writeFile(options.destFile, buffer)
+  await writeFile(options.destFile, content)
 }

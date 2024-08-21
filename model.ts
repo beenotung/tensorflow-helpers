@@ -1,13 +1,14 @@
 import * as tf from '@tensorflow/tfjs-node'
 import { existsSync, mkdirSync } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
-import { join } from 'path'
+import { basename, join } from 'path'
 import {
   CropAndResizeAspectRatio,
-  cropAndResize,
-  loadImageFileAsync,
-  loadImageFileSync,
+  cropAndResizeImageTensor,
+  loadImageFile,
 } from './image'
+import { isContentHash } from './file'
+import { toOneTensor } from './tensor'
 
 export type IOHandler = Exclude<Parameters<tf.GraphModel['save']>[0], string>
 export type ModelArtifacts = Parameters<Required<IOHandler>['save']>[0]
@@ -171,12 +172,23 @@ export const PreTrainedImageModels = {
 
 export type ImageModel = Awaited<ReturnType<typeof loadImageModel>>
 
+/**
+ * @description cache image embedding keyed by filename.
+ * The dirname is ignored.
+ * The filename is expected to be content hash (w/wo extname)
+ */
+export type EmbeddingCache = {
+  get(filename: string): number[] | null | undefined
+  set(filename: string, values: number[]): void
+}
+
 export async function loadImageModel(options: {
   spec: ImageModelSpec
   dir: string
   aspectRatio?: CropAndResizeAspectRatio
+  cache?: EmbeddingCache | boolean
 }) {
-  let { spec, dir, aspectRatio } = options
+  let { spec, dir, aspectRatio, cache } = options
   let { url, width, height, channels } = spec
 
   let model = await cachedLoadGraphModel({
@@ -184,128 +196,102 @@ export async function loadImageModel(options: {
     dir,
   })
 
-  async function loadImageAsync(file: string): Promise<tf.Tensor4D> {
-    let imageTensor = await loadImageFileAsync(file, {
+  async function loadImageCropped(
+    file: string,
+    options?: {
+      expandAnimations?: boolean
+    },
+  ): Promise<tf.Tensor3D | tf.Tensor4D> {
+    let imageTensor = await loadImageFile(file, {
       channels,
-      expandAnimations: false,
+      expandAnimations: options?.expandAnimations,
+      crop: {
+        width,
+        height,
+        aspectRatio,
+      },
     })
-    imageTensor = cropAndResize({
-      imageTensor,
-      width,
-      height,
-      aspectRatio,
-    })
-    return imageTensor
-  }
-
-  function loadImageSync(file: string): tf.Tensor4D {
-    let imageTensor = loadImageFileSync(file, {
-      channels,
-      expandAnimations: false,
-    })
-    return cropAndResize({
-      imageTensor,
-      width,
-      height,
-      aspectRatio,
-    })
-  }
-
-  async function loadAnimatedImageAsync(file: string): Promise<tf.Tensor4D> {
-    let imageTensor = await loadImageFileAsync(file, {
-      channels,
-      expandAnimations: true,
-    })
-    return cropAndResize({
-      imageTensor,
-      width,
-      height,
-      aspectRatio,
-    })
-  }
-
-  function loadAnimatedImageSync(file: string): tf.Tensor4D {
-    let imageTensor = loadImageFileSync(file, {
-      channels,
-      expandAnimations: true,
-    })
-    imageTensor = cropAndResize({
-      imageTensor,
-      width,
-      height,
-      aspectRatio,
-    })
-    return imageTensor
+    return imageTensor as tf.Tensor4D
   }
 
   let fileEmbeddingCache = new Map<string, tf.Tensor<tf.Rank>>()
 
-  async function inferEmbeddingAsync(
-    file_or_image_tensor: string | tf.Tensor,
-    options: { cache?: boolean } = {},
-  ): Promise<tf.Tensor<tf.Rank>> {
-    /* check cache */
-    if (options.cache && typeof file_or_image_tensor == 'string') {
-      let embedding = fileEmbeddingCache.get(file_or_image_tensor)
-      if (embedding) return embedding
-    }
+  function checkCache(file: string): tf.Tensor | void {
+    if (!cache || !isContentHash(file)) return
 
-    let inputs: tf.Tensor =
-      typeof file_or_image_tensor == 'string'
-        ? await loadImageAsync(file_or_image_tensor)
-        : file_or_image_tensor
+    let filename = basename(file)
 
-    return inferHelper(file_or_image_tensor, options, inputs)
-  }
+    let embedding = fileEmbeddingCache.get(filename)
+    if (embedding) return embedding
 
-  function inferEmbeddingSync(
-    file_or_image_tensor: string | tf.Tensor,
-    options: { cache?: boolean } = {},
-  ): tf.Tensor<tf.Rank> {
-    /* check cache */
-    if (options.cache && typeof file_or_image_tensor == 'string') {
-      let embedding = fileEmbeddingCache.get(file_or_image_tensor)
-      if (embedding) return embedding
-    }
+    if (cache == true) return
 
-    let inputs: tf.Tensor =
-      typeof file_or_image_tensor == 'string'
-        ? loadImageSync(file_or_image_tensor)
-        : file_or_image_tensor
+    let values = cache.get(filename)
+    if (!values) return
 
-    return inferHelper(file_or_image_tensor, options, inputs)
-  }
-
-  function inferHelper(
-    file_or_image_tensor: string | tf.Tensor,
-    options: { cache?: boolean },
-    inputs: tf.Tensor,
-  ) {
-    let outputs = model.predict(inputs)
-    if (typeof file_or_image_tensor == 'string') {
-      inputs.dispose()
-    }
-    let embedding = Array.isArray(outputs)
-      ? tf.concat(outputs)
-      : (outputs as tf.Tensor)
-
-    /* update cache */
-    if (options.cache && typeof file_or_image_tensor == 'string') {
-      fileEmbeddingCache.set(file_or_image_tensor, embedding)
-    }
+    embedding = tf.tensor(values)
+    fileEmbeddingCache.set(filename, embedding)
 
     return embedding
+  }
+
+  async function saveCache(file: string, embedding: tf.Tensor) {
+    let filename = basename(file)
+
+    fileEmbeddingCache.set(filename, embedding)
+
+    if (typeof cache == 'object') {
+      let values = Array.from(await embedding.data())
+      cache.set(filename, values)
+    }
+  }
+
+  async function imageFileToEmbedding(
+    file: string,
+    options?: { expandAnimations?: boolean },
+  ): Promise<tf.Tensor> {
+    let embedding = checkCache(file)
+    if (embedding) return embedding
+    let content = await readFile(file)
+    return tf.tidy(() => {
+      let dtype = undefined
+      let expandAnimations = options?.expandAnimations
+      let imageTensor = tf.node.decodeImage(
+        content,
+        channels,
+        dtype,
+        expandAnimations,
+      )
+      let embedding = imageTensorToEmbedding(imageTensor)
+      if (cache) {
+        saveCache(file, embedding)
+      }
+      return embedding
+    })
+  }
+
+  function imageTensorToEmbedding(
+    imageTensor: tf.Tensor3D | tf.Tensor4D,
+  ): tf.Tensor {
+    return tf.tidy(() => {
+      imageTensor = cropAndResizeImageTensor({
+        imageTensor,
+        width,
+        height,
+        aspectRatio,
+      })
+      let outputs = model.predict(imageTensor)
+      let embedding = toOneTensor(outputs)
+      return embedding
+    })
   }
 
   return {
     spec,
     model,
-    loadImageAsync,
-    loadImageSync,
-    loadAnimatedImageAsync,
-    loadAnimatedImageSync,
+    loadImageCropped,
     fileEmbeddingCache,
-    inferEmbeddingAsync,
-    inferEmbeddingSync,
+    imageFileToEmbedding,
+    imageTensorToEmbedding,
   }
 }
