@@ -74,31 +74,34 @@ export async function loadImageClassifierModel(options: {
     })
   }
 
-  async function classifyAsync(
-    file_or_image_tensor: string | tf.Tensor,
+  async function classifyImageFile(
+    file: string,
   ): Promise<ClassificationResult[]> {
-    let embedding = await baseModel.inferEmbeddingAsync(file_or_image_tensor)
-    let outputs = classifierModel.predict(embedding)
+    let embedding = await baseModel.imageFileToEmbedding(file)
+    /* do not dispose embedding because it may be cached */
+    return classifyImageEmbedding(embedding)
+  }
+
+  async function classifyImageTensor(
+    imageTensor: tf.Tensor3D | tf.Tensor4D,
+  ): Promise<ClassificationResult[]> {
+    let embedding = baseModel.imageTensorToEmbedding(imageTensor)
+    let results = await classifyImageEmbedding(embedding)
     embedding.dispose()
-    let values = await toOneTensor(outputs).data()
+    return results
+  }
+
+  async function classifyImageEmbedding(embedding: tf.Tensor) {
+    let outputs = tf.tidy(() => {
+      let outputs = classifierModel.predict(embedding)
+      return toOneTensor(outputs)
+    })
+    let values = await outputs.data()
     disposeTensor(outputs)
     return mapWithClassName(classNames, values)
   }
 
-  function classifySync(
-    file_or_image_tensor: string | tf.Tensor,
-  ): ClassificationResult[] {
-    let embedding = baseModel.inferEmbeddingSync(file_or_image_tensor)
-    let outputs = classifierModel.predict(embedding)
-    embedding.dispose()
-    let values = toOneTensor(outputs).dataSync()
-    disposeTensor(outputs)
-    return mapWithClassName(classNames, values)
-  }
-
-  async function loadDatasetFromDirectoryAsync(
-    options: { cache?: boolean } = {},
-  ) {
+  async function loadDatasetFromDirectory() {
     let xs: tf.Tensor[] = []
     let classIndices: number[] = []
     let classCounts: number[] = new Array(classNames.length).fill(0)
@@ -123,7 +126,7 @@ export async function loadImageClassifierModel(options: {
           nextI += total / 100
         }
         let file = join(dir, filename)
-        let embedding = await baseModel.inferEmbeddingAsync(file, options)
+        let embedding = await baseModel.imageFileToEmbedding(file)
         xs.push(embedding)
         classIndices.push(classIdx)
         classCounts[classIdx]++
@@ -133,7 +136,7 @@ export async function loadImageClassifierModel(options: {
 
     let x = tf.concat(xs)
 
-    if (!options.cache) {
+    if (!baseModel.fileEmbeddingCache) {
       for (let x of xs) {
         x.dispose()
       }
@@ -146,7 +149,7 @@ export async function loadImageClassifierModel(options: {
     return { x, y, classCounts }
   }
 
-  async function trainAsync(
+  async function train(
     options?: tf.ModelFitArgs &
       (
         | {
@@ -186,7 +189,7 @@ export async function loadImageClassifierModel(options: {
           : undefined)
       return next(x, y, classWeight)
     } else {
-      let { x, y, classCounts } = await loadDatasetFromDirectoryAsync()
+      let { x, y, classCounts } = await loadDatasetFromDirectory()
       let classWeight =
         options?.classWeight ||
         calcClassWeight({
@@ -211,11 +214,12 @@ export async function loadImageClassifierModel(options: {
     baseModel,
     classifierModel,
     classNames,
-    classifyAsync,
-    classifySync,
-    loadDatasetFromDirectoryAsync,
+    classifyImageFile,
+    classifyImageTensor,
+    classifyImageEmbedding,
+    loadDatasetFromDirectory,
     compile,
-    trainAsync,
+    train,
     save,
   }
 }

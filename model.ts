@@ -214,19 +214,19 @@ export async function loadImageModel(options: {
     return imageTensor as tf.Tensor4D
   }
 
-  let fileEmbeddingCache = new Map<string, tf.Tensor<tf.Rank>>()
+  let fileEmbeddingCache: Map<string, tf.Tensor<tf.Rank>> | null = cache
+    ? new Map()
+    : null
 
   function checkCache(file: string): tf.Tensor | void {
-    if (!cache || !isContentHash(file)) return
+    if (!fileEmbeddingCache || !isContentHash(file)) return
 
     let filename = basename(file)
 
     let embedding = fileEmbeddingCache.get(filename)
     if (embedding) return embedding
 
-    if (cache == true) return
-
-    let values = cache.get(filename)
+    let values = typeof cache == 'object' ? cache.get(filename) : undefined
     if (!values) return
 
     embedding = tf.tensor(values)
@@ -238,7 +238,7 @@ export async function loadImageModel(options: {
   async function saveCache(file: string, embedding: tf.Tensor) {
     let filename = basename(file)
 
-    fileEmbeddingCache.set(filename, embedding)
+    fileEmbeddingCache!.set(filename, embedding)
 
     if (typeof cache == 'object') {
       let values = Array.from(await embedding.data())
