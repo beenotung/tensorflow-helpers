@@ -8,6 +8,11 @@ export async function loadImageFileAsync(
     channels?: number
     dtype?: string
     expandAnimations?: boolean
+    crop?: {
+      width: number
+      height: number
+      aspectRatio?: CropAndResizeAspectRatio
+    }
   },
 ): Promise<tf.Tensor3D | tf.Tensor4D> {
   let buffer = await readFile(file)
@@ -19,6 +24,14 @@ export async function loadImageFileAsync(
         options.expandAnimations,
       )
     : tf.node.decodeImage(buffer)
+  if (options?.crop) {
+    tensor = cropAndResize({
+      imageTensor: tensor,
+      width: options.crop.width,
+      height: options.crop.height,
+      aspectRatio: options.crop.aspectRatio,
+    })
+  }
   return tensor as tf.Tensor3D
 }
 
@@ -28,6 +41,11 @@ export function loadImageFileSync(
     channels?: number
     dtype?: string
     expandAnimations?: boolean
+    crop?: {
+      width: number
+      height: number
+      aspectRatio?: CropAndResizeAspectRatio
+    }
   },
 ): tf.Tensor3D | tf.Tensor4D {
   let buffer = readFileSync(file)
@@ -39,6 +57,14 @@ export function loadImageFileSync(
         options.expandAnimations,
       )
     : tf.node.decodeImage(buffer)
+  if (options?.crop) {
+    tensor = cropAndResize({
+      imageTensor: tensor,
+      width: options.crop.width,
+      height: options.crop.height,
+      aspectRatio: options.crop.aspectRatio,
+    })
+  }
   return tensor as tf.Tensor3D
 }
 
