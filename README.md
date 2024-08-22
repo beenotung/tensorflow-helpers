@@ -155,7 +155,9 @@ export type ImageModelSpec = {
 export type ImageModel = {
   spec: ImageModelSpec
   model: Model
+
   fileEmbeddingCache: Map<string, tf.Tensor> | null
+  checkCache(file: string): tf.Tensor | void
 
   loadImageCropped(
     file: string,

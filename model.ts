@@ -290,6 +290,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     spec,
     model,
     fileEmbeddingCache,
+    checkCache,
     loadImageCropped,
     imageFileToEmbedding,
     imageTensorToEmbedding,
