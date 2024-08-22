@@ -229,7 +229,7 @@ export async function loadImageModel(options: {
     let values = typeof cache == 'object' ? cache.get(filename) : undefined
     if (!values) return
 
-    embedding = tf.tensor(values)
+    embedding = tf.tensor([values])
     fileEmbeddingCache.set(filename, embedding)
 
     return embedding
