@@ -218,10 +218,10 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     ? new Map()
     : null
 
-  function checkCache(file: string): tf.Tensor | void {
-    if (!fileEmbeddingCache || !isContentHash(file)) return
+  function checkCache(file_or_filename: string): tf.Tensor | void {
+    if (!fileEmbeddingCache || !isContentHash(file_or_filename)) return
 
-    let filename = basename(file)
+    let filename = basename(file_or_filename)
 
     let embedding = fileEmbeddingCache.get(filename)
     if (embedding) return embedding

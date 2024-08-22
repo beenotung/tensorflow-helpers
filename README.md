@@ -157,7 +157,7 @@ export type ImageModel = {
   model: Model
 
   fileEmbeddingCache: Map<string, tf.Tensor> | null
-  checkCache(file: string): tf.Tensor | void
+  checkCache(file_or_filename: string): tf.Tensor | void
 
   loadImageCropped(
     file: string,
