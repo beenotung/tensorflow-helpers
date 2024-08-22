@@ -22,7 +22,7 @@ export function isContentHash(file_or_filename: string): boolean {
   let filename = basename(file_or_filename)
   let ext = extname(filename)
   let name = ext.length == 0 ? filename : filename.slice(0, -ext.length)
-  return Buffer.from(name, 'hex').length * 8 == 256
+  return name.length * 4 == 256 && Buffer.from(name, 'hex').length * 8 == 256
 }
 
 export async function saveFile(args: {
