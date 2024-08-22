@@ -16,6 +16,10 @@ export type ClassifierModelSpec = {
 export function createImageClassifier(spec: ClassifierModelSpec) {
   let { hiddenLayers } = spec
 
+  if (spec.classes < 2) {
+    throw new Error('image classifier must be at least 2 classes')
+  }
+
   let classifierModel = tf.sequential()
   classifierModel.add(
     tf.layers.inputLayer({ inputShape: [spec.embeddingFeatures] }),
@@ -56,6 +60,10 @@ export async function loadImageClassifierModel(options: {
 
   let classNames = options.classNames || readdirSync(datasetDir)
 
+  if (classNames.length < 2) {
+    throw new Error('expect at least 2 classes')
+  }
+
   let classifierModel = existsSync(modelDir)
     ? await loadLayersModel({ dir: modelDir })
     : createImageClassifier({
@@ -63,6 +71,16 @@ export async function loadImageClassifierModel(options: {
         hiddenLayers: options.hiddenLayers,
         classes: classNames.length,
       })
+
+  let classCount = getClassCount(classifierModel.outputShape)
+  if (classCount != classNames.length) {
+    throw new Error(
+      'number of classes mismatch, expected: ' +
+        classNames.length +
+        ', got: ' +
+        classCount,
+    )
+  }
 
   let compiled = false
 
@@ -218,6 +236,23 @@ export async function loadImageClassifierModel(options: {
     compile,
     train,
     save,
+  }
+}
+
+function getClassCount(shape: tf.Shape | tf.Shape[]): number {
+  for (;;) {
+    let value = shape[0]
+    for (let i = 1; i < shape.length; i++) {
+      value = shape[i] || value
+    }
+    if (Array.isArray(value)) {
+      shape = value
+      continue
+    }
+    if (!value) {
+      throw new Error('failed to get class count')
+    }
+    return value
   }
 }
 
