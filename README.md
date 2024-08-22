@@ -135,6 +135,8 @@ export function cachedLoadLayersModel(options: {
 export function loadImageModel(options: {
   spec: ImageModelSpec
   dir: string
+  aspectRatio?: CropAndResizeAspectRatio
+  cache?: EmbeddingCache | boolean
 }): Promise<ImageModel>
 
 export type ImageModelSpec = {
@@ -148,7 +150,7 @@ export type ImageModelSpec = {
 export type ImageModel = {
   spec: ImageModelSpec
   model: Model
-  fileEmbeddingCache: Map<string, tf.Tensor>
+  fileEmbeddingCache: Map<string, tf.Tensor> | null
 
   loadImageCropped(
     file: string,
