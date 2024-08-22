@@ -263,7 +263,7 @@ export async function loadImageModel(options: {
         expandAnimations,
       )
       let embedding = imageTensorToEmbedding(imageTensor)
-      if (cache) {
+      if (cache && isContentHash(file)) {
         saveCache(file, embedding)
       }
       return embedding
