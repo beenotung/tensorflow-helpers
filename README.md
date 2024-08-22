@@ -140,7 +140,6 @@ export function loadImageModel(options: {
 }): Promise<ImageModel>
 
 export type EmbeddingCache = {
-  has(filename: string): boolean
   get(filename: string): number[] | null | undefined
   set(filename: string, values: number[]): void
 }

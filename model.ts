@@ -178,17 +178,15 @@ export type ImageModel = Awaited<ReturnType<typeof loadImageModel>>
  * The filename is expected to be content hash (w/wo extname)
  */
 export type EmbeddingCache = {
-  keys(): string[]
-  has(filename: string): boolean
   get(filename: string): number[] | null | undefined
   set(filename: string, values: number[]): void
 }
 
-export async function loadImageModel(options: {
+export async function loadImageModel<Cache extends EmbeddingCache>(options: {
   spec: ImageModelSpec
   dir: string
   aspectRatio?: CropAndResizeAspectRatio
-  cache?: EmbeddingCache | boolean
+  cache?: Cache | boolean
 }) {
   let { spec, dir, aspectRatio, cache } = options
   let { url, width, height, channels } = spec
