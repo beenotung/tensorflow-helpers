@@ -38,6 +38,7 @@
     "tsc": "tsc -p ."
   },
   "dependencies": {
+    "@beenotung/tslib": "^23.10.1",
     "@tensorflow/tfjs-node": "^4.20.0"
   },
   "peerDependencies": {

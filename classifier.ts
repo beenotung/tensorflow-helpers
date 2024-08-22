@@ -5,6 +5,7 @@ import { readdir } from 'fs/promises'
 import { join } from 'path'
 import { disposeTensor, toOneTensor } from './tensor'
 import { ClassWeight, ClassWeightMap } from '@tensorflow/tfjs-node'
+import { startTimer } from '@beenotung/tslib/timer'
 
 export type ClassifierModelSpec = {
   embeddingFeatures: number
@@ -116,23 +117,19 @@ export async function loadImageClassifierModel(options: {
       }),
     )
 
-    let i = 0
-    let nextI = 0
+    let timer = startTimer('load dataset')
+    timer.setEstimateProgress(total)
     for (let { classIdx, dir, filenames } of classes) {
       for (let filename of filenames) {
-        i++
-        if (i >= nextI) {
-          process.stderr.write(`\rload dataset: ${i}/${total}`)
-          nextI += total / 100
-        }
         let file = join(dir, filename)
         let embedding = await baseModel.imageFileToEmbedding(file)
         xs.push(embedding)
         classIndices.push(classIdx)
         classCounts[classIdx]++
+        timer.tick()
       }
     }
-    process.stderr.write(`\rload dataset: ${i}/${total}\n`)
+    timer.end()
 
     let x = tf.concat(xs)
 
