@@ -289,8 +289,8 @@ export async function loadImageModel(options: {
   return {
     spec,
     model,
-    loadImageCropped,
     fileEmbeddingCache,
+    loadImageCropped,
     imageFileToEmbedding,
     imageTensorToEmbedding,
   }
