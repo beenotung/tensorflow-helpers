@@ -178,6 +178,7 @@ export type ImageModel = Awaited<ReturnType<typeof loadImageModel>>
  * The filename is expected to be content hash (w/wo extname)
  */
 export type EmbeddingCache = {
+  has(filename: string): boolean
   get(filename: string): number[] | null | undefined
   set(filename: string, values: number[]): void
 }
