@@ -139,6 +139,12 @@ export function loadImageModel(options: {
   cache?: EmbeddingCache | boolean
 }): Promise<ImageModel>
 
+export type EmbeddingCache = {
+  has(filename: string): boolean
+  get(filename: string): number[] | null | undefined
+  set(filename: string, values: number[]): void
+}
+
 export type ImageModelSpec = {
   url: string
   width: number
