@@ -256,12 +256,19 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     return tf.tidy(() => {
       let dtype = undefined
       let expandAnimations = options?.expandAnimations
-      let imageTensor = tf.node.decodeImage(
-        content,
-        channels,
-        dtype,
-        expandAnimations,
-      )
+      let imageTensor: tf.Tensor3D | tf.Tensor4D
+      try {
+        imageTensor = tf.node.decodeImage(
+          content,
+          channels,
+          dtype,
+          expandAnimations,
+        )
+      } catch (error) {
+        throw new Error('failed to decode image: ' + JSON.stringify(file), {
+          cause: error,
+        })
+      }
       let embedding = imageTensorToEmbedding(imageTensor)
       if (cache && isContentHash(file)) {
         saveCache(file, embedding)
