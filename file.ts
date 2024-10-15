@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
-import { readFile, readdir, rename, writeFile } from 'fs/promises'
+import { getDirFilenames } from '@beenotung/tslib/fs'
+import { readFile, rename, writeFile } from 'fs/promises'
 import { basename, dirname, extname, join } from 'path'
 
 /**
@@ -8,7 +9,7 @@ import { basename, dirname, extname, join } from 'path'
  * - return list of (renamed) filenames
  */
 export async function scanDir(dir: string) {
-  let filenames = await readdir(dir)
+  let filenames = await getDirFilenames(dir)
   for (let i = 0; i < filenames.length; i++) {
     let filename = filenames[i]
     if (!isContentHash(filename)) {
