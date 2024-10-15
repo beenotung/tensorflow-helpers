@@ -1,6 +1,7 @@
-import { mkdirSync, readdirSync } from 'fs'
+import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { cropAndResizeImageFile } from './image'
+import { getDirFilenamesSync } from '@beenotung/tslib'
 
 async function main() {
   const aspectRatio = 'center-crop'
@@ -10,7 +11,7 @@ async function main() {
   mkdirSync('resize/wide', { recursive: true })
   mkdirSync('resize/down', { recursive: true })
 
-  let filenames = readdirSync('dataset/real')
+  let filenames = getDirFilenamesSync('dataset/real')
   for (let filename of filenames) {
     let srcFile = join('dataset/real', filename)
 

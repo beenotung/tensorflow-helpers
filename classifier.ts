@@ -1,11 +1,12 @@
 import { ImageModel, loadLayersModel, saveModel } from './model'
 import * as tf from '@tensorflow/tfjs-node'
-import { readdirSync, existsSync } from 'fs'
+import { existsSync } from 'fs'
 import { readdir } from 'fs/promises'
 import { join } from 'path'
 import { disposeTensor, toOneTensor } from './tensor'
 import { ClassWeight, ClassWeightMap } from '@tensorflow/tfjs-node'
 import { startTimer } from '@beenotung/tslib/timer'
+import { getDirFilenamesSync } from '@beenotung/tslib/fs'
 
 export type ClassifierModelSpec = {
   embeddingFeatures: number
@@ -58,7 +59,7 @@ export async function loadImageClassifierModel(options: {
 }) {
   let { baseModel, datasetDir, modelDir } = options
 
-  let classNames = options.classNames || readdirSync(datasetDir)
+  let classNames = options.classNames || getDirFilenamesSync(datasetDir)
 
   if (classNames.length < 2) {
     throw new Error('expect at least 2 classes')
