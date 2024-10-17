@@ -14,7 +14,9 @@ import {
   getClassCount,
   mapWithClassName,
 } from './classifier-utils'
-import { ClassWeight, ClassWeightMap } from '@tensorflow/tfjs'
+export * from './tensor'
+export * from './image-utils'
+export * from './classifier-utils'
 
 async function readFile(url: string) {
   let res = await fetch(url)

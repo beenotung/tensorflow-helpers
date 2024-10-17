@@ -1,6 +1,9 @@
 import { selectImage } from '@beenotung/tslib/file'
-import { loadImageClassifierModel, loadImageModel } from './browser'
-import { toOneTensor } from './tensor'
+import {
+  loadImageClassifierModel,
+  loadImageModel,
+  toOneTensor,
+} from './browser'
 
 declare var selectButton: HTMLButtonElement
 
