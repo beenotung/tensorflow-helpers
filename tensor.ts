@@ -1,4 +1,4 @@
-import * as tf from '@tensorflow/tfjs-node'
+import * as tf from '@tensorflow/tfjs-core'
 
 export function disposeTensor(tensor: tf.Tensor | tf.Tensor[]) {
   if (Array.isArray(tensor)) {

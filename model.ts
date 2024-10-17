@@ -9,6 +9,8 @@ import {
 } from './image'
 import { isContentHash } from './file'
 import { toOneTensor } from './tensor'
+import { ImageModelSpec } from './image-model'
+export { ImageModelSpec, PreTrainedImageModels } from './image-model'
 
 export type IOHandler = Exclude<Parameters<tf.GraphModel['save']>[0], string>
 export type ModelArtifacts = Parameters<Required<IOHandler>['save']>[0]
@@ -61,8 +63,7 @@ export async function loadGraphModel(options: {
         weights = [weights]
       }
       for (let i = 0; i < weights.length; i++) {
-        let buffer = await readFile(join(dir, `weight-${i}.bin`))
-        weights[i] = new Uint8Array(buffer)
+        weights[i] = await loadWeightData(join(dir, `weight-${i}.bin`))
       }
       return modelArtifact
     },
@@ -126,48 +127,6 @@ export async function cachedLoadLayersModel(options: {
   let model = await tf.loadLayersModel(modelUrl, { fromTFHub: true })
   await saveModel({ model, dir: modelDir })
   return model
-}
-
-export type ImageModelSpec = {
-  url: string
-  width: number
-  height: number
-  channels: number
-  features: number
-}
-
-export const PreTrainedImageModels = {
-  mobilenet: {
-    // #param, accuracy, and latency see: https://keras.io/api/applications/mobilenet/#mobilenetv3large-function
-    'mobilenet-v3-large-100': {
-      url: 'https://www.kaggle.com/models/google/mobilenet-v3/TfJs/large-100-224-feature-vector/1' as const,
-      width: 224 as const,
-      height: 224 as const,
-      channels: 3 as const,
-      features: 1280 as const,
-    },
-    'mobilenet-v3-large-75': {
-      url: 'https://www.kaggle.com/models/google/mobilenet-v3/TfJs/large-075-224-feature-vector/1' as const,
-      width: 224 as const,
-      height: 224 as const,
-      channels: 3 as const,
-      features: 1280 as const,
-    },
-    'mobilenet-v3-small-100': {
-      url: 'https://www.kaggle.com/models/google/mobilenet-v3/TfJs/small-100-224-feature-vector/1' as const,
-      width: 224 as const,
-      height: 224 as const,
-      channels: 3 as const,
-      features: 1280 as const,
-    },
-    'mobilenet-v3-small-75': {
-      url: 'https://www.kaggle.com/models/google/mobilenet-v3/TfJs/small-075-224-feature-vector/1' as const,
-      width: 224 as const,
-      height: 224 as const,
-      channels: 3 as const,
-      features: 1280 as const,
-    },
-  },
 }
 
 export type ImageModel = Awaited<ReturnType<typeof loadImageModel>>

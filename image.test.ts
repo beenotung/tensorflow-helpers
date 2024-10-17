@@ -1,7 +1,7 @@
 import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { cropAndResizeImageFile } from './image'
-import { getDirFilenamesSync } from '@beenotung/tslib'
+import { getDirFilenamesSync } from '@beenotung/tslib/fs'
 
 async function main() {
   const aspectRatio = 'center-crop'
