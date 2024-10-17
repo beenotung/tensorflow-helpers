@@ -476,6 +476,16 @@ export async function loadImageClassifierModel(options: {
     return classifyImageEmbedding(embedding)
   }
 
+  async function classifyImage(
+    image: Parameters<typeof tf.browser.fromPixels>[0],
+  ): Promise<ClassificationResult[]> {
+    let imageTensor = await tf.browser.fromPixelsAsync(image)
+    let embedding = baseModel.imageTensorToEmbedding(imageTensor)
+    imageTensor.dispose()
+    /* do not dispose embedding because it may be cached */
+    return classifyImageEmbedding(embedding)
+  }
+
   async function classifyImageTensor(
     imageTensor: tf.Tensor3D | tf.Tensor4D,
   ): Promise<ClassificationResult[]> {
@@ -530,6 +540,7 @@ export async function loadImageClassifierModel(options: {
     classifyImageUrl,
     classifyImageFile,
     classifyImageTensor,
+    classifyImage,
     classifyImageEmbedding,
     compile,
     train,
