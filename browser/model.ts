@@ -92,7 +92,14 @@ async function cachedLoadModel<
   let localLastModified = +localStorage.getItem(cacheUrl)!
   let checkTime = Date.now()
   let remoteLastModified = options.checkForUpdates
-    ? await getLastModified(modelUrl)
+    ? await getLastModified(modelUrl).catch(error => {
+        if (localLastModified) {
+          // skip checking if offline and already cached
+          return localLastModified
+        }
+        // throw error if offline without pre-cached copy
+        throw error
+      })
     : 0
 
   if (
