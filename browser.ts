@@ -280,14 +280,20 @@ export type EmbeddingCache = {
 
 export async function loadImageModel<Cache extends EmbeddingCache>(options: {
   url: string
-  cacheUrl: string
+  cacheUrl?: string
   checkForUpdates?: boolean
   aspectRatio?: CropAndResizeAspectRatio
   cache?: Cache | boolean
 }) {
   let { aspectRatio, cache } = options
 
-  let model = await cachedLoadGraphModel(options)
+  let model = options.cacheUrl
+    ? await cachedLoadGraphModel({
+        url: options.url,
+        cacheUrl: options.cacheUrl,
+        checkForUpdates: options.checkForUpdates,
+      })
+    : await tf.loadGraphModel(options.url)
   let spec = getModelSpec(options.url, model)
   let { width, height, channels } = spec
 
