@@ -1,7 +1,9 @@
 import * as tf from '@tensorflow/tfjs-core'
 import { toTensor4D } from './tensor'
 
-export function getImageTensorShape(imageTensor: tf.Tensor3D | tf.Tensor4D) {
+export type ImageTensor = tf.Tensor3D | tf.Tensor4D
+
+export function getImageTensorShape(imageTensor: ImageTensor) {
   return imageTensor.shape.length === 3
     ? {
         width: imageTensor.shape[1],
@@ -51,8 +53,6 @@ export function calcCropBox(options: {
 
   return [top, left, bottom, right]
 }
-
-export type ImageTensor = tf.Tensor3D | tf.Tensor4D
 
 /**
  * @description default is 'rescale'

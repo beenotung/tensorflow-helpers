@@ -239,7 +239,7 @@ export type ImageModel = {
 </details>
 
 <details>
-<summary>Image Helper Functions</summary>
+<summary>Image helper functions and types</summary>
 
 ```typescript
 export function loadImageFile(
@@ -255,6 +255,8 @@ export function loadImageFile(
     }
   },
 ): Promise<tf.Tensor3D | tf.Tensor4D>
+
+export type ImageTensor = tf.Tensor3D | tf.Tensor4D
 
 export function getImageTensorShape(imageTensor: tf.Tensor3D | tf.Tensor4D): {
   width: number
@@ -417,6 +419,129 @@ export function hashContent(
 
 /** @returns new filename with content hash and extname */
 export async function renameFileByContentHash(file: string): Promise<string>
+```
+
+</details>
+
+<details>
+<summary>(Browser version) model functions and types</summary>
+
+````typescript
+/**
+ * @example `loadGraphModel({ url: 'saved_model/mobilenet-v3-large-100' })`
+ */
+export function loadGraphModel(options: { url: string }): Promise<tf.GraphModel>
+
+/**
+ * @example `loadGraphModel({ url: 'saved_model/emotion-classifier' })`
+ */
+export function loadLayersModel(options: {
+  url: string
+}): Promise<tf.LayersModel>
+
+/**
+ * @example ```
+ * cachedLoadGraphModel({
+ *   url: 'saved_model/mobilenet-v3-large-100',
+ *   cacheUrl: 'indexeddb://mobilenet-v3-large-100',
+ * })
+ * ```
+ */
+export function cachedLoadGraphModel(options: {
+  url: string
+  cacheUrl: string
+  checkForUpdates?: boolean
+}): Promise<tf.GraphModel<string | tf.io.IOHandler>>
+
+/**
+ * @example ```
+ * cachedLoadLayersModel({
+ *   url: 'saved_model/emotion-classifier',
+ *   cacheUrl: 'indexeddb://emotion-classifier',
+ * })
+ * ```
+ */
+export function cachedLoadLayersModel(options: {
+  url: string
+  cacheUrl: string
+  checkForUpdates?: boolean
+}): Promise<tf.LayersModel>
+````
+
+</details>
+
+<details>
+<summary>(Browser version) image model functions and types</summary>
+
+```typescript
+export type ImageModel = {
+  spec: ImageModelSpec
+  model: tf.GraphModel<string | tf.io.IOHandler>
+  fileEmbeddingCache: Map<string, tf.Tensor<tf.Rank>> | null
+  checkCache: (url: string) => tf.Tensor | void
+  loadImageCropped: (url: string) => Promise<tf.Tensor4D & tf.Tensor<tf.Rank>>
+  imageUrlToEmbedding: (url: string) => Promise<tf.Tensor>
+  imageFileToEmbedding: (file: File) => Promise<tf.Tensor>
+  imageTensorToEmbedding: (imageTensor: ImageTensor) => tf.Tensor
+}
+
+/**
+ * @description cache image embedding keyed by filename.
+ * The dirname is ignored.
+ * The filename is expected to be content hash (w/wo extname)
+ */
+export type EmbeddingCache = {
+  get(url: string): number[] | null | undefined
+  set(url: string, values: number[]): void
+}
+
+export function loadImageModel<Cache extends EmbeddingCache>(options: {
+  url: string
+  cacheUrl?: string
+  checkForUpdates?: boolean
+  aspectRatio?: CropAndResizeAspectRatio
+  cache?: Cache | boolean
+}): Promise<ImageModel>
+```
+
+</details>
+
+<details>
+<summary>(Browser version) classifier functions and types</summary>
+
+```typescript
+export type ClassifierModel = {
+  baseModel: ImageModel
+  classifierModel: tf.LayersModel | tf.Sequential
+  classNames: string[]
+  classifyImageUrl(url: string): Promise<ClassificationResult[]>
+  classifyImageFile(file: File): Promise<ClassificationResult[]>
+  classifyImageTensor(
+    imageTensor: tf.Tensor3D | tf.Tensor4D,
+  ): Promise<ClassificationResult[]>
+  classifyImage(
+    image: Parameters<typeof tf.browser.fromPixels>[0],
+  ): Promise<ClassificationResult[]>
+  classifyImageEmbedding(embedding: tf.Tensor): Promise<ClassificationResult[]>
+  compile(): void
+  train(
+    options: tf.ModelFitArgs & {
+      x: tf.Tensor<tf.Rank>
+      y: tf.Tensor<tf.Rank>
+      /** @description to calculate classWeight */
+      classCounts?: number[]
+    },
+  ): Promise<tf.History>
+}
+
+export function loadImageClassifierModel(options: {
+  baseModel: ImageModel
+  hiddenLayers?: number[]
+  modelUrl?: string
+  cacheUrl?: string
+  checkForUpdates?: boolean
+  classNames: string[]
+}): Promise<ClassifierModel>
 ```
 
 </details>
