@@ -1,6 +1,6 @@
 # tensorflow-helpers
 
-Helper functions to use tensorflow in nodejs for transfer learning, image classification, and more.
+Helper functions to use tensorflow in nodejs/browser for transfer learning, image classification, and more.
 
 [![npm Package Version](https://img.shields.io/npm/v/tensorflow-helpers)](https://www.npmjs.com/package/tensorflow-helpers)
 
@@ -11,6 +11,8 @@ Helper functions to use tensorflow in nodejs for transfer learning, image classi
 - Correctly save/load model on filesystem[1]
 - Load image file into tensor with resize and crop
 - List varies pre-trained models (url, image dimension, embedding size)
+- Support both nodejs and browser environment
+- Support caching model and image embedding
 - Typescript support
 - Works with plain Javascript, Typescript is not mandatory
 
@@ -27,6 +29,52 @@ You can also install `tensorflow-helpers` with [pnpm](https://pnpm.io/), [yarn](
 ## Usage Example
 
 See [model.test.ts](./model.test.ts) and [classifier.test.ts](./classifier.test.ts) for complete examples.
+
+**Usage from browser**:
+
+```typescript
+import {
+  loadImageClassifierModel,
+  loadImageModel,
+  toOneTensor,
+} from 'tensorflow-helpers/browser'
+
+declare var fileInput: HTMLInputElement
+
+async function main() {
+  let baseModel = await loadImageModel({
+    url: 'saved_model/mobilenet-v3-large-100',
+    cacheUrl: 'indexeddb://mobilenet-v3-large-100',
+    checkForUpdates: false,
+  })
+
+  let classifier = await loadImageClassifierModel({
+    baseModel,
+    classNames: ['anime', 'real', 'others'],
+    modelUrl: 'saved_model/emotion-classifier',
+    cacheUrl: 'indexeddb://emotion-classifier',
+  })
+
+  fileInput.onchange = async () => {
+    let file = fileInput.files?.[0]
+    if (!file) return
+
+    /* load from file directly */
+    let result1 = await classifier.classifyImageFile(file)
+    // result1 is Array<{ label: string, confidence: number }>
+
+    /* load from embedding tensor */
+    let embeddingTensor = await baseModel.imageFileToEmbedding(file)
+    let embeddingFeatures = toOneTensor(embeddingTensor).dataSync()
+    // embeddingFeatures is Float32Array
+
+    let result1 = await classifier.classifyImageEmbedding(embeddingTensor)
+  }
+}
+main().catch(e => console.error(e))
+```
+
+**Usage from nodejs**:
 
 ```typescript
 import {
@@ -49,7 +97,7 @@ let classifier = await loadImageClassifierModel({
   modelDir: 'saved_model/classifier_model',
   hiddenLayers: [128],
   datasetDir: 'dataset',
-  // classNames: ['anime', 'real'], // auto scan from datasetDir
+  // classNames: ['anime', 'real', 'others'], // auto scan from datasetDir
 })
 
 // auto load training dataset
@@ -76,8 +124,19 @@ Details see the type hints from IDE.
 <details>
 <summary>Shortcut to tensorflow</summary>
 
+exported as `'tensorflow-helpers'`:
+
 ```typescript
 import * as tfjs from '@tensorflow/tfjs-node'
+
+export let tensorflow: typeof tfjs
+export let tf: typeof tfjs
+```
+
+exported as `'tensorflow-helpers/browser'`:
+
+```typescript
+import * as tfjs from '@tensorflow/tfjs'
 
 export let tensorflow: typeof tfjs
 export let tf: typeof tfjs

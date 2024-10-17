@@ -1,4 +1,4 @@
-import * as tf from '@tensorflow/tfjs'
+import * as tfjs from '@tensorflow/tfjs'
 import { ModelArtifacts } from '@tensorflow/tfjs-core/dist/io/types'
 import {
   CropAndResizeAspectRatio,
@@ -14,9 +14,22 @@ import {
   getClassCount,
   mapWithClassName,
 } from './classifier-utils'
+import type {
+  GraphModel,
+  ModelFitArgs,
+  Rank,
+  Tensor,
+  Tensor3D,
+  Tensor4D,
+  History,
+} from '@tensorflow/tfjs'
 export * from './tensor'
+export * from './image-model'
 export * from './image-utils'
 export * from './classifier-utils'
+
+export let tensorflow = tfjs
+export let tf = tensorflow
 
 async function readFile(url: string) {
   let res = await fetch(url)
@@ -209,7 +222,7 @@ function getInt(str: string) {
   throw new TypeError(`expect int value, got: ${JSON.stringify(str)}`)
 }
 
-function getModelSpec(url: string, model: tf.GraphModel) {
+function getModelSpec(url: string, model: GraphModel) {
   let { signature } = model as any as ModelWithSignature
 
   let inputs = Object.values(signature.inputs)[0]
@@ -300,11 +313,11 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     })
   }
 
-  let fileEmbeddingCache: Map<string, tf.Tensor<tf.Rank>> | null = cache
+  let fileEmbeddingCache: Map<string, Tensor<Rank>> | null = cache
     ? new Map()
     : null
 
-  function checkCache(url: string): tf.Tensor | void {
+  function checkCache(url: string): Tensor | void {
     if (!fileEmbeddingCache || !isContentHash(url)) return
 
     let filename = basename(url)
@@ -321,7 +334,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     return embedding
   }
 
-  async function saveCache(file: string, embedding: tf.Tensor) {
+  async function saveCache(file: string, embedding: Tensor) {
     let filename = basename(file)
 
     fileEmbeddingCache!.set(filename, embedding)
@@ -332,7 +345,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     }
   }
 
-  async function imageUrlToEmbedding(url: string): Promise<tf.Tensor> {
+  async function imageUrlToEmbedding(url: string): Promise<Tensor> {
     let embedding = checkCache(url)
     if (embedding) return embedding
 
@@ -348,7 +361,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     return embedding
   }
 
-  async function imageFileToEmbedding(file: File): Promise<tf.Tensor> {
+  async function imageFileToEmbedding(file: File): Promise<Tensor> {
     let filename = file.name
     let embedding = checkCache(filename)
     if (embedding) return embedding
@@ -372,7 +385,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     return embedding
   }
 
-  function imageTensorToEmbedding(imageTensor: ImageTensor): tf.Tensor {
+  function imageTensorToEmbedding(imageTensor: ImageTensor): Tensor {
     return tf.tidy(() => {
       let inputTensor = cropAndResizeImageTensor({
         imageTensor,
@@ -489,7 +502,7 @@ export async function loadImageClassifierModel(options: {
   }
 
   async function classifyImageTensor(
-    imageTensor: tf.Tensor3D | tf.Tensor4D,
+    imageTensor: Tensor3D | Tensor4D,
   ): Promise<ClassificationResult[]> {
     let embedding = baseModel.imageTensorToEmbedding(imageTensor)
     let results = await classifyImageEmbedding(embedding)
@@ -497,7 +510,7 @@ export async function loadImageClassifierModel(options: {
     return results
   }
 
-  async function classifyImageEmbedding(embedding: tf.Tensor) {
+  async function classifyImageEmbedding(embedding: Tensor) {
     let outputs = tf.tidy(() => {
       let outputs = classifierModel.predict(embedding)
       return toOneTensor(outputs)
@@ -508,13 +521,13 @@ export async function loadImageClassifierModel(options: {
   }
 
   async function train(
-    options: tf.ModelFitArgs & {
-      x: tf.Tensor<tf.Rank>
-      y: tf.Tensor<tf.Rank>
+    options: ModelFitArgs & {
+      x: Tensor<Rank>
+      y: Tensor<Rank>
       /** @description to calculate classWeight */
       classCounts?: number[]
     },
-  ): Promise<tf.History> {
+  ): Promise<History> {
     if (!compiled) {
       compile()
     }
