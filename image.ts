@@ -1,10 +1,10 @@
-import { readFile, writeFile } from 'fs/promises'
-import * as tf from '@tensorflow/tfjs-node'
+import * as tf from '@tensorflow/tfjs'
 import { toTensor3D } from './tensor'
 import {
   CropAndResizeAspectRatio,
   cropAndResizeImageTensor,
 } from './image-utils'
+import sharp from 'sharp'
 export {
   getImageTensorShape,
   Box,
@@ -52,15 +52,17 @@ export async function loadImageFile(
     }
   },
 ): Promise<tf.Tensor3D | tf.Tensor4D> {
-  let content = await readFile(file)
-  let tensor = options
-    ? tf.node.decodeImage(
-        content,
-        options.channels,
-        options.dtype,
-        options.expandAnimations ?? false,
-      )
-    : tf.node.decodeImage(content)
+  const { data, info } = await sharp(file)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+
+  let tensor = tf.tensor4d(
+    data,
+    [1, info.height, info.width, info.channels],
+    'int32',
+  )
+
   if (options?.crop) {
     tensor = cropAndResizeImageTensor({
       imageTensor: tensor,
@@ -86,9 +88,15 @@ export async function cropAndResizeImageFile(options: {
       aspectRatio: options.aspectRatio,
     },
   })
-  let tensor3D = tf.tidy(() => toTensor3D(imageTensor).mul<tf.Tensor3D>(255))
-  let content = await tf.node.encodeJpeg(tensor3D)
-  tf.image.cropAndResize
+  let tensor3D = tf.tidy(() => toTensor3D(imageTensor)).mul<tf.Tensor3D>(255)
+  let shape = tensor3D.shape
+  let data = await tensor3D.data()
   tensor3D.dispose()
-  await writeFile(options.destFile, content)
+  await sharp(data, {
+    raw: {
+      height: shape[0],
+      width: shape[1],
+      channels: shape[2] as 3,
+    },
+  }).toFile(options.destFile)
 }
