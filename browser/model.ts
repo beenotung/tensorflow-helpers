@@ -7,10 +7,11 @@ import {
 } from '../image-utils'
 import { ImageModelSpec } from '../image-model'
 import { toOneTensor } from '../tensor'
-
-export type ModelArtifactsWithClassNames = ModelArtifacts & {
-  classNames?: string[]
-}
+import {
+  attachClassNames,
+  checkClassNames,
+  ModelArtifactsWithClassNames,
+} from '../classifier-utils'
 
 async function readFile(url: string) {
   let res = await fetch(url)
@@ -58,11 +59,16 @@ async function getLastModified(url: string) {
  */
 export async function loadGraphModel(options: {
   url: string
-}): Promise<tf.GraphModel> {
+  classNames?: string[]
+}) {
   let url = removeModelUrlPrefix(options.url)
+  let classNames = options.classNames
   let model = await tf.loadGraphModel({
     async load() {
-      let modelArtifact: ModelArtifacts = await readJSON(url + '/model.json')
+      let modelArtifact: ModelArtifactsWithClassNames = await readJSON(
+        url + '/model.json',
+      )
+      classNames = checkClassNames(modelArtifact, classNames)
       let weights = modelArtifact.weightData
       if (!weights) {
         throw new Error('missing weightData')
@@ -76,22 +82,23 @@ export async function loadGraphModel(options: {
       return modelArtifact
     },
   })
-  return model
+  return attachClassNames(model, classNames)
 }
 
 async function cachedLoadModel<
-  Model extends { save(url: string): Promise<unknown> },
+  Model extends { save(url: string): Promise<unknown>; classNames?: string[] },
 >(args: {
   options: {
     url: string
     cacheUrl: string
     checkForUpdates?: boolean
+    classNames?: string[]
   }
   loadRemoteModel(): Promise<Model>
   loadLocalModel(): Promise<Model>
 }) {
   let { options, loadRemoteModel, loadLocalModel } = args
-  let { url: modelUrl, cacheUrl } = options
+  let { url: modelUrl, cacheUrl, classNames } = options
 
   let localLastModified = +localStorage.getItem(cacheUrl)!
   let checkTime = Date.now()
@@ -112,7 +119,8 @@ async function cachedLoadModel<
   ) {
     try {
       let model = await loadLocalModel()
-      return model
+      classNames = checkClassNames(model, classNames)
+      return attachClassNames(model, classNames)
     } catch (error) {
       if (!String(error).includes('Cannot find model with path')) {
         throw error
@@ -120,7 +128,9 @@ async function cachedLoadModel<
     }
   }
 
-  let model = await loadRemoteModel()
+  let _model = await loadRemoteModel()
+  classNames = checkClassNames(_model, classNames)
+  let model = attachClassNames(_model, classNames)
 
   await model.save(cacheUrl)
   localStorage.setItem(cacheUrl, (remoteLastModified || checkTime).toString())
@@ -142,17 +152,7 @@ export async function loadLayersModel(options: {
       let modelArtifact: ModelArtifactsWithClassNames = await readJSON(
         url + '/model.json',
       )
-      if (
-        classNames &&
-        modelArtifact.classNames &&
-        JSON.stringify(classNames) !== JSON.stringify(modelArtifact.classNames)
-      ) {
-        throw new Error(
-          `classNames mismatch, expected: ${JSON.stringify(
-            classNames,
-          )}, actual: ${JSON.stringify(modelArtifact.classNames)}`,
-        )
-      }
+      classNames = checkClassNames(modelArtifact, classNames)
       let weights = modelArtifact.weightData
       if (!weights) {
         throw new Error('missing weightData')
@@ -167,7 +167,7 @@ export async function loadLayersModel(options: {
       return modelArtifact
     },
   })
-  return model
+  return attachClassNames(model, classNames)
 }
 
 /**
@@ -182,6 +182,7 @@ export async function cachedLoadGraphModel(options: {
   url: string
   cacheUrl: string
   checkForUpdates?: boolean
+  classNames?: string[]
 }) {
   return cachedLoadModel({
     options,
@@ -202,6 +203,7 @@ export async function cachedLoadLayersModel(options: {
   url: string
   cacheUrl: string
   checkForUpdates?: boolean
+  classNames?: string[]
 }) {
   return cachedLoadModel({
     options,

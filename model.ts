@@ -10,15 +10,13 @@ import {
 import { isContentHash } from './file'
 import { toOneTensor } from './tensor'
 import { ImageModelSpec } from './image-model'
+import {
+  attachClassNames,
+  checkClassNames,
+  ModelArtifactsWithClassNames,
+  SaveResult,
+} from './classifier-utils'
 export { ImageModelSpec, PreTrainedImageModels } from './image-model'
-
-export type IOHandler = Exclude<Parameters<tf.GraphModel['save']>[0], string>
-export type ModelArtifacts = Parameters<Required<IOHandler>['save']>[0]
-export type SaveResult = ReturnType<Required<IOHandler>['save']>
-
-export type ModelArtifactsWithClassNames = ModelArtifacts & {
-  classNames?: string[]
-}
 
 export type Model = tf.GraphModel | tf.LayersModel
 
@@ -57,12 +55,16 @@ export async function saveModel(options: {
 
 export async function loadGraphModel(options: {
   dir: string
-}): Promise<tf.GraphModel> {
-  let { dir } = options
+  classNames?: string[]
+}) {
+  let { dir, classNames } = options
   let model = await tf.loadGraphModel({
     async load() {
       let buffer = await readFile(join(dir, 'model.json'))
-      let modelArtifact: ModelArtifacts = JSON.parse(buffer.toString())
+      let modelArtifact: ModelArtifactsWithClassNames = JSON.parse(
+        buffer.toString(),
+      )
+      classNames = checkClassNames(modelArtifact, classNames)
       let weights = modelArtifact.weightData
       if (!weights) {
         throw new Error('missing weightData')
@@ -76,13 +78,13 @@ export async function loadGraphModel(options: {
       return modelArtifact
     },
   })
-  return model
+  return attachClassNames(model, classNames)
 }
 
 export async function loadLayersModel(options: {
   dir: string
   classNames?: string[]
-}): Promise<tf.LayersModel> {
+}) {
   let { dir, classNames } = options
   let model = await tf.loadLayersModel({
     async load() {
@@ -90,17 +92,7 @@ export async function loadLayersModel(options: {
       let modelArtifact: ModelArtifactsWithClassNames = JSON.parse(
         buffer.toString(),
       )
-      if (
-        classNames &&
-        modelArtifact.classNames &&
-        JSON.stringify(classNames) !== JSON.stringify(modelArtifact.classNames)
-      ) {
-        throw new Error(
-          `classNames mismatch, expected: ${JSON.stringify(
-            classNames,
-          )}, actual: ${JSON.stringify(modelArtifact.classNames)}`,
-        )
-      }
+      classNames = checkClassNames(modelArtifact, classNames)
       let weights = modelArtifact.weightData
       if (!weights) {
         throw new Error('missing weightData')
@@ -117,7 +109,7 @@ export async function loadLayersModel(options: {
       return modelArtifact
     },
   })
-  return model
+  return attachClassNames(model, classNames)
 }
 
 async function loadWeightData(file: string) {
@@ -128,27 +120,29 @@ async function loadWeightData(file: string) {
 export async function cachedLoadGraphModel(options: {
   url: string
   dir: string
-}): Promise<Model> {
-  let { url: modelUrl, dir: modelDir } = options
+  classNames?: string[]
+}) {
+  let { url: modelUrl, dir: modelDir, classNames } = options
   if (existsSync(modelDir)) {
     return await loadGraphModel(options)
   }
   let model = await tf.loadGraphModel(modelUrl, { fromTFHub: true })
-  await saveModel({ model, dir: modelDir })
-  return model
+  await saveModel({ model, dir: modelDir, classNames })
+  return attachClassNames(model, classNames)
 }
 
 export async function cachedLoadLayersModel(options: {
   url: string
   dir: string
-}): Promise<Model> {
-  let { url: modelUrl, dir: modelDir } = options
+  classNames?: string[]
+}) {
+  let { url: modelUrl, dir: modelDir, classNames } = options
   if (existsSync(modelDir)) {
     return await loadLayersModel(options)
   }
   let model = await tf.loadLayersModel(modelUrl, { fromTFHub: true })
-  await saveModel({ model, dir: modelDir })
-  return model
+  await saveModel({ model, dir: modelDir, classNames })
+  return attachClassNames(model, classNames)
 }
 
 export type ImageModel = Awaited<ReturnType<typeof loadImageModel>>
