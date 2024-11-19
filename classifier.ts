@@ -26,13 +26,11 @@ export async function loadImageClassifierModel(options: {
   /** @description if not provided, will be auto scanned from datasetDir or load from the model.json */
   classNames?: string[]
 }) {
-  let { baseModel, datasetDir, modelDir } = options
+  let { baseModel, datasetDir, modelDir, classNames } = options
 
-  let _classNames =
-    options.classNames || existsSync(datasetDir)
-      ? getDirFilenamesSync(datasetDir)
-      : []
-  let classNames = _classNames.length > 0 ? _classNames : undefined
+  if (!classNames && existsSync(datasetDir)) {
+    classNames = getDirFilenamesSync(datasetDir)
+  }
 
   let classifierModel = existsSync(modelDir)
     ? await loadLayersModel({ dir: modelDir, classNames })
