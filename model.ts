@@ -16,15 +16,23 @@ export type IOHandler = Exclude<Parameters<tf.GraphModel['save']>[0], string>
 export type ModelArtifacts = Parameters<Required<IOHandler>['save']>[0]
 export type SaveResult = ReturnType<Required<IOHandler>['save']>
 
+export type ModelArtifactsWithClassNames = ModelArtifacts & {
+  classNames?: string[]
+}
+
 export type Model = tf.GraphModel | tf.LayersModel
 
 export async function saveModel(options: {
   model: Model
   dir: string
+  classNames?: string[]
 }): Promise<SaveResult> {
-  let { dir, model } = options
+  let { dir, model, classNames } = options
   return await model.save({
-    async save(modelArtifact: ModelArtifacts) {
+    async save(modelArtifact: ModelArtifactsWithClassNames) {
+      if (classNames) {
+        modelArtifact.classNames = classNames
+      }
       let weights = modelArtifact.weightData
       if (!weights) {
         throw new Error('missing weightData')
@@ -73,12 +81,26 @@ export async function loadGraphModel(options: {
 
 export async function loadLayersModel(options: {
   dir: string
+  classNames?: string[]
 }): Promise<tf.LayersModel> {
-  let { dir } = options
+  let { dir, classNames } = options
   let model = await tf.loadLayersModel({
     async load() {
       let buffer = await readFile(join(dir, 'model.json'))
-      let modelArtifact: ModelArtifacts = JSON.parse(buffer.toString())
+      let modelArtifact: ModelArtifactsWithClassNames = JSON.parse(
+        buffer.toString(),
+      )
+      if (
+        classNames &&
+        modelArtifact.classNames &&
+        JSON.stringify(classNames) !== JSON.stringify(modelArtifact.classNames)
+      ) {
+        throw new Error(
+          `classNames mismatch, expected: ${JSON.stringify(
+            classNames,
+          )}, actual: ${JSON.stringify(modelArtifact.classNames)}`,
+        )
+      }
       let weights = modelArtifact.weightData
       if (!weights) {
         throw new Error('missing weightData')

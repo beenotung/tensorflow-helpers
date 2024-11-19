@@ -8,6 +8,10 @@ import {
 import { ImageModelSpec } from '../image-model'
 import { toOneTensor } from '../tensor'
 
+export type ModelArtifactsWithClassNames = ModelArtifacts & {
+  classNames?: string[]
+}
+
 async function readFile(url: string) {
   let res = await fetch(url)
   let buffer = await res.arrayBuffer()
@@ -127,11 +131,28 @@ async function cachedLoadModel<
 /**
  * @example `loadGraphModel({ url: 'saved_model/emotion-classifier' })`
  */
-export async function loadLayersModel(options: { url: string }) {
+export async function loadLayersModel(options: {
+  url: string
+  classNames?: string[]
+}) {
   let url = removeModelUrlPrefix(options.url)
+  let classNames = options.classNames
   let model = await tf.loadLayersModel({
     async load() {
-      let modelArtifact: ModelArtifacts = await readJSON(url + '/model.json')
+      let modelArtifact: ModelArtifactsWithClassNames = await readJSON(
+        url + '/model.json',
+      )
+      if (
+        classNames &&
+        modelArtifact.classNames &&
+        JSON.stringify(classNames) !== JSON.stringify(modelArtifact.classNames)
+      ) {
+        throw new Error(
+          `classNames mismatch, expected: ${JSON.stringify(
+            classNames,
+          )}, actual: ${JSON.stringify(modelArtifact.classNames)}`,
+        )
+      }
       let weights = modelArtifact.weightData
       if (!weights) {
         throw new Error('missing weightData')

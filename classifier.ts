@@ -35,7 +35,7 @@ export async function loadImageClassifierModel(options: {
   }
 
   let classifierModel = existsSync(modelDir)
-    ? await loadLayersModel({ dir: modelDir })
+    ? await loadLayersModel({ dir: modelDir, classNames })
     : createImageClassifier({
         embeddingFeatures: baseModel.spec.features,
         hiddenLayers: options.hiddenLayers,
@@ -192,6 +192,7 @@ export async function loadImageClassifierModel(options: {
     return await saveModel({
       model: classifierModel,
       dir,
+      classNames,
     })
   }
 
