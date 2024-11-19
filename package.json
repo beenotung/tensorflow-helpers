@@ -1,6 +1,6 @@
 {
   "name": "tensorflow-helpers",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Helper functions to use tensorflow in nodejs for transfer learning, image classification, and more",
   "keywords": [
     "tensorflow",
