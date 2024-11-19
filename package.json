@@ -41,9 +41,9 @@
     "tsc": "tsc -p ."
   },
   "dependencies": {
-    "@beenotung/tslib": "^24.0.0",
-    "@tensorflow/tfjs": "^4.21.0",
-    "@tensorflow/tfjs-node": "^4.21.0"
+    "@beenotung/tslib": "^24.1.0",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-node": "^4.22.0"
   },
   "peerDependencies": {
     "@tensorflow/tfjs-core": "^4.21.0"
@@ -54,13 +54,13 @@
     }
   },
   "devDependencies": {
-    "@tensorflow/tfjs-core": "^4.21.0",
-    "@types/node": "^22.5.0",
+    "@tensorflow/tfjs-core": "^4.22.0",
+    "@types/node": "^22.9.0",
     "esbuild": "^0.24.0",
     "mk-package": "^1.0.2",
     "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.6.3"
   }
 }
