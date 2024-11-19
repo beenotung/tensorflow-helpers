@@ -13,6 +13,9 @@ export function createImageClassifier(spec: ClassifierModelSpec) {
   if (spec.classes < 2) {
     throw new Error('image classifier must be at least 2 classes')
   }
+  if (classNames && classNames.length !== spec.classes) {
+    throw new Error('classNames length mismatch')
+  }
 
   let classifierModel = tf.sequential()
   classifierModel.add(

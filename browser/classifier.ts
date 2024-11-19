@@ -19,13 +19,10 @@ export async function loadImageClassifierModel(options: {
   modelUrl?: string
   cacheUrl?: string
   checkForUpdates?: boolean
-  classNames: string[]
+  /** @description if not provided, will be auto scanned from datasetDir or load from the model.json */
+  classNames?: string[]
 }) {
   let { baseModel, classNames } = options
-
-  if (classNames.length < 2) {
-    throw new Error('expect at least 2 classes')
-  }
 
   async function loadClassifierModel() {
     let { modelUrl: url, cacheUrl, checkForUpdates } = options
@@ -35,6 +32,7 @@ export async function loadImageClassifierModel(options: {
           url,
           cacheUrl,
           checkForUpdates,
+          classNames,
         })
         return model
       } catch (error) {
@@ -46,20 +44,24 @@ export async function loadImageClassifierModel(options: {
     return createImageClassifier({
       embeddingFeatures: baseModel.spec.features,
       hiddenLayers: options.hiddenLayers,
-      classes: classNames.length,
+      get classes() {
+        if (!classNames) {
+          throw new Error('classNames not provided')
+        }
+        return classNames.length
+      },
+      classNames,
     })
   }
 
   let classifierModel = await loadClassifierModel()
-
-  let classCount = getClassCount(classifierModel.outputShape)
-  if (classCount != classNames.length) {
-    throw new Error(
-      'number of classes mismatch, expected: ' +
-        classNames.length +
-        ', got: ' +
-        classCount,
-    )
+  classNames = classifierModel.classNames
+  if (!classNames) {
+    throw new Error('classNames not provided')
+  }
+  let classCount = classNames.length
+  if (classCount < 2) {
+    throw new Error('expect at least 2 classes')
   }
 
   let compiled = false
@@ -115,7 +117,7 @@ export async function loadImageClassifierModel(options: {
     })
     let values = await outputs.data()
     disposeTensor(outputs)
-    return mapWithClassName(classNames, values)
+    return mapWithClassName(classNames!, values)
   }
 
   async function train(
@@ -134,7 +136,7 @@ export async function loadImageClassifierModel(options: {
       options.classWeight ||
       (classCounts
         ? calcClassWeight({
-            classes: classNames.length,
+            classes: classCount,
             classCounts,
           })
         : undefined)

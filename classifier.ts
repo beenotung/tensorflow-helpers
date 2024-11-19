@@ -10,7 +10,6 @@ import {
   ClassificationResult,
   calcClassWeight,
   createImageClassifier,
-  getClassCount,
   mapWithClassName,
 } from './classifier-utils'
 export * from './classifier-utils'
@@ -24,32 +23,37 @@ export async function loadImageClassifierModel(options: {
   hiddenLayers?: number[]
   modelDir: string
   datasetDir: string
+  /** @description if not provided, will be auto scanned from datasetDir or load from the model.json */
   classNames?: string[]
 }) {
   let { baseModel, datasetDir, modelDir } = options
 
-  let classNames = options.classNames || getDirFilenamesSync(datasetDir)
-
-  if (classNames.length < 2) {
-    throw new Error('expect at least 2 classes')
-  }
+  let _classNames =
+    options.classNames || existsSync(datasetDir)
+      ? getDirFilenamesSync(datasetDir)
+      : []
+  let classNames = _classNames.length > 0 ? _classNames : undefined
 
   let classifierModel = existsSync(modelDir)
     ? await loadLayersModel({ dir: modelDir, classNames })
     : createImageClassifier({
         embeddingFeatures: baseModel.spec.features,
         hiddenLayers: options.hiddenLayers,
-        classes: classNames.length,
+        get classes() {
+          if (!classNames) {
+            throw new Error('classNames not provided')
+          }
+          return classNames.length
+        },
+        classNames,
       })
-
-  let classCount = getClassCount(classifierModel.outputShape)
-  if (classCount != classNames.length) {
-    throw new Error(
-      'number of classes mismatch, expected: ' +
-        classNames.length +
-        ', got: ' +
-        classCount,
-    )
+  classNames = classifierModel.classNames
+  if (!classNames) {
+    throw new Error('classNames not provided')
+  }
+  let classCount = classNames.length
+  if (classCount < 2) {
+    throw new Error('expect at least 2 classes')
   }
 
   let compiled = false
@@ -87,17 +91,17 @@ export async function loadImageClassifierModel(options: {
     })
     let values = await outputs.data()
     disposeTensor(outputs)
-    return mapWithClassName(classNames, values)
+    return mapWithClassName(classNames!, values)
   }
 
   async function loadDatasetFromDirectory() {
     let xs: tf.Tensor[] = []
     let classIndices: number[] = []
-    let classCounts: number[] = new Array(classNames.length).fill(0)
+    let classCounts: number[] = new Array(classCount).fill(0)
 
     let total = 0
     let classes = await Promise.all(
-      classNames.map(async (className, classIdx) => {
+      classNames!.map(async (className, classIdx) => {
         let dir = join(datasetDir, className)
         let filenames = await getDirFilenames(dir)
         total += filenames.length
@@ -128,7 +132,7 @@ export async function loadImageClassifierModel(options: {
     }
 
     let y = tf.tidy(() =>
-      tf.oneHot(tf.tensor1d(classIndices, 'int32'), classNames.length),
+      tf.oneHot(tf.tensor1d(classIndices, 'int32'), classCount),
     )
 
     return { x, y, classCounts }
@@ -168,7 +172,7 @@ export async function loadImageClassifierModel(options: {
         options.classWeight ||
         (classCounts
           ? calcClassWeight({
-              classes: classNames.length,
+              classes: classCount,
               classCounts,
             })
           : undefined)
@@ -178,7 +182,7 @@ export async function loadImageClassifierModel(options: {
       let classWeight =
         options?.classWeight ||
         calcClassWeight({
-          classes: classNames.length,
+          classes: classCount,
           classCounts,
         })
       let history = await next(x, y, classWeight)
