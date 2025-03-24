@@ -62,5 +62,12 @@
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.6.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@tensorflow/tfjs-node",
+      "core-js",
+      "esbuild"
+    ]
   }
 }
