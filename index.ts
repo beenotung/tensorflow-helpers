@@ -5,6 +5,7 @@ export * from './image-utils'
 export * from './model'
 export * from './classifier'
 export * from './classifier-utils'
+export * from './model-utils'
 export * from './tensor'
 export * from './file'
 

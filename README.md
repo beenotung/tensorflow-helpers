@@ -394,6 +394,37 @@ export function mapWithClassName(
 </details>
 
 <details>
+<summary>Model helper functions</summary>
+
+```typescript
+/**
+ * A factor to give larger hidden layer size for complex tasks:
+ * - 1 for easy tasks
+ * - 2-3 for medium difficulty tasks
+ * - 4-5 for complex tasks
+ *
+ * Remark: giving too high difficulty may result in over-fitting.
+ */
+export type Difficulty = number
+
+/** Formula `hiddenSize = difficulty * sqrt(inputSize * outputSize)` */
+export function calcHiddenLayerSize(options: {
+  inputSize: number
+  outputSize: number
+  difficulty?: Difficulty
+})
+
+/** Inject one or more hidden layers that's having large gap between input size and output size. */
+export function injectHiddenLayers(options: {
+  layers: number[]
+  difficulty?: Difficulty
+  numberOfHiddenLayers?: number
+})
+```
+
+</details>
+
+<details>
 <summary>File helper functions</summary>
 
 ```typescript
