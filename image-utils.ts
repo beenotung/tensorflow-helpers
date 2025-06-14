@@ -1,5 +1,6 @@
 import * as tf from '@tensorflow/tfjs-core'
 import { toTensor4D } from './tensor'
+import { Sharp } from 'sharp'
 
 export type ImageTensor = tf.Tensor3D | tf.Tensor4D
 
@@ -86,8 +87,42 @@ export function cropAndResizeImageTensor(options: {
       [0],
       [height, width],
     )
-    return crop.div<tf.Tensor4D>(255)
+    return tf.div(crop, 255) as tf.Tensor4D
   })
   imageTensor.dispose()
   return croppedImageTensor
+}
+
+export function cropAndResizeImageSharp(options: {
+  image: Sharp
+  width: number
+  height: number
+  aspectRatio?: CropAndResizeAspectRatio
+}): Sharp {
+  let { image, width, height } = options
+
+  if (options.aspectRatio != 'center-crop') {
+    // scale to target size, stretch to fill
+    return image.resize(width, height, { fit: 'fill' })
+  } else {
+    // crop at center, clip to target size
+    return image.resize(width, height, { fit: 'cover', position: 'centre' })
+  }
+}
+
+export async function imageSharpToTensor(image: Sharp): Promise<tf.Tensor4D> {
+  let { data, info } = await image
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  return tf.tidy(() => {
+    let tensor = tf.tensor(
+      data,
+      [info.height, info.width, info.channels],
+      'float32',
+    )
+    tensor = tf.div(tensor, 255)
+    tensor = tf.expandDims(tensor, 0)
+    return tensor as tf.Tensor4D
+  })
 }

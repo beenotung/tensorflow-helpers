@@ -1,9 +1,11 @@
-import * as tf from '@tensorflow/tfjs-node'
+import * as tf from '@tensorflow/tfjs'
+import sharp, { Sharp } from 'sharp'
 import { existsSync, mkdirSync } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import { basename, join } from 'path'
 import {
   CropAndResizeAspectRatio,
+  cropAndResizeImageSharp,
   cropAndResizeImageTensor,
   loadImageFile,
 } from './image'
@@ -17,6 +19,7 @@ import {
   ModelArtifactsWithClassNames,
   SaveResult,
 } from './classifier-utils'
+import { imageSharpToTensor } from './image-utils'
 export { ImageModelSpec, PreTrainedImageModels } from './image-model'
 
 export type Model = tf.GraphModel | tf.LayersModel
@@ -239,29 +242,20 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
   ): Promise<tf.Tensor> {
     let embedding = checkCache(file)
     if (embedding) return embedding
-    let content = await readFile(file)
-    return tf.tidy(() => {
-      let dtype = undefined
-      let expandAnimations = options?.expandAnimations
-      let imageTensor: tf.Tensor3D | tf.Tensor4D
-      try {
-        imageTensor = tf.node.decodeImage(
-          content,
-          channels,
-          dtype,
-          expandAnimations,
-        )
-      } catch (error) {
-        throw new Error('failed to decode image: ' + JSON.stringify(file), {
-          cause: error,
-        })
-      }
-      let embedding = imageTensorToEmbedding(imageTensor)
-      if (cache && isContentHash(file)) {
-        saveCache(file, embedding)
-      }
-      return embedding
-    })
+
+    try {
+      let image = sharp(file)
+      embedding = await imageSharpToEmbedding(image)
+    } catch (error) {
+      throw new Error('failed to load image: ' + JSON.stringify(file), {
+        cause: error,
+      })
+    }
+
+    if (cache && isContentHash(file)) {
+      saveCache(file, embedding)
+    }
+    return embedding
   }
 
   function imageTensorToEmbedding(
@@ -280,6 +274,18 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     })
   }
 
+  async function imageSharpToEmbedding(image: Sharp): Promise<tf.Tensor> {
+    image = cropAndResizeImageSharp({ image, width, height, aspectRatio })
+    let imageTensor = await imageSharpToTensor(image)
+    let embedding = tf.tidy(() => {
+      let outputs = model.predict(imageTensor)
+      let embedding = toOneTensor(outputs)
+      return embedding
+    })
+    imageTensor.dispose()
+    return embedding
+  }
+
   return {
     spec,
     model,
@@ -288,5 +294,6 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     loadImageCropped,
     imageFileToEmbedding,
     imageTensorToEmbedding,
+    imageSharpToEmbedding,
   }
 }

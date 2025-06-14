@@ -42,22 +42,17 @@
   },
   "dependencies": {
     "@beenotung/tslib": "^24.6.2",
-    "@tensorflow/tfjs": "^4.22.0",
-    "@tensorflow/tfjs-node": "^4.22.0"
+    "@tensorflow/tfjs": "^4.22.0"
   },
   "peerDependencies": {
     "@tensorflow/tfjs": "^4.22.0",
-    "@tensorflow/tfjs-core": "^4.21.0",
-    "@tensorflow/tfjs-node": "^4.22.0"
+    "@tensorflow/tfjs-core": "^4.21.0"
   },
   "peerDependenciesMeta": {
     "@tensorflow/tfjs": {
       "optional": true
     },
     "@tensorflow/tfjs-core": {
-      "optional": true
-    },
-    "@tensorflow/tfjs-node": {
       "optional": true
     }
   },
@@ -73,7 +68,6 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "@tensorflow/tfjs-node",
       "core-js",
       "esbuild"
     ]

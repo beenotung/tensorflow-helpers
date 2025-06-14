@@ -37,7 +37,7 @@ export function toTensor3D(tensor: tf.Tensor3D | tf.Tensor4D): tf.Tensor3D {
   if (tensor.rank == 3) {
     return tensor as tf.Tensor3D
   }
-  let tensor3D = tensor.squeeze<tf.Tensor3D>([0])
+  let tensor3D = tf.squeeze(tensor, [0]) as tf.Tensor3D
   tensor.dispose()
   return tensor3D
 }

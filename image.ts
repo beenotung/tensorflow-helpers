@@ -1,15 +1,17 @@
-import { readFile, writeFile } from 'fs/promises'
-import * as tf from '@tensorflow/tfjs-node'
-import { toTensor3D } from './tensor'
+import * as tf from '@tensorflow/tfjs'
 import {
   CropAndResizeAspectRatio,
+  cropAndResizeImageSharp,
   cropAndResizeImageTensor,
+  imageSharpToTensor,
 } from './image-utils'
+import sharp from 'sharp'
 export {
   getImageTensorShape,
   Box,
   calcCropBox,
   CropAndResizeAspectRatio,
+  cropAndResizeImageSharp,
   cropAndResizeImageTensor,
 } from './image-utils'
 
@@ -52,24 +54,14 @@ export async function loadImageFile(
     }
   },
 ): Promise<tf.Tensor3D | tf.Tensor4D> {
-  let content = await readFile(file)
-  let tensor = options
-    ? tf.node.decodeImage(
-        content,
-        options.channels,
-        options.dtype,
-        options.expandAnimations ?? false,
-      )
-    : tf.node.decodeImage(content)
+  let image = sharp(file)
   if (options?.crop) {
-    tensor = cropAndResizeImageTensor({
-      imageTensor: tensor,
-      width: options.crop.width,
-      height: options.crop.height,
-      aspectRatio: options.crop.aspectRatio,
+    image = cropAndResizeImageSharp({
+      image,
+      ...options.crop,
     })
   }
-  return tensor
+  return imageSharpToTensor(image)
 }
 
 export async function cropAndResizeImageFile(options: {
@@ -79,16 +71,12 @@ export async function cropAndResizeImageFile(options: {
   height: number
   aspectRatio?: CropAndResizeAspectRatio
 }): Promise<void> {
-  let imageTensor = await loadImageFile(options.srcFile, {
-    crop: {
-      width: options.width,
-      height: options.height,
-      aspectRatio: options.aspectRatio,
-    },
+  let image = sharp(options.srcFile)
+  image = cropAndResizeImageSharp({
+    image,
+    width: options.width,
+    height: options.height,
+    aspectRatio: options.aspectRatio,
   })
-  let tensor3D = tf.tidy(() => toTensor3D(imageTensor).mul<tf.Tensor3D>(255))
-  let content = await tf.node.encodeJpeg(tensor3D)
-  tf.image.cropAndResize
-  tensor3D.dispose()
-  await writeFile(options.destFile, content)
+  await image.toFile(options.destFile)
 }

@@ -1,4 +1,4 @@
-import * as tfjs from '@tensorflow/tfjs-node'
+import * as tfjs from '@tensorflow/tfjs-core'
 export * from './image'
 export * from './image-model'
 export * from './image-utils'
