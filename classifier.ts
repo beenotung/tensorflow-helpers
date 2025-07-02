@@ -23,10 +23,11 @@ export async function loadImageClassifierModel(options: {
   hiddenLayers?: number[]
   modelDir: string
   datasetDir: string
+  testDatasetDir?: string
   /** @description if not provided, will be auto scanned from datasetDir or load from the model.json */
   classNames?: string[]
 }) {
-  let { baseModel, datasetDir, modelDir, classNames } = options
+  let { baseModel, datasetDir, testDatasetDir, modelDir, classNames } = options
 
   if (!classNames && existsSync(datasetDir)) {
     classNames = getDirFilenamesSync(datasetDir)
@@ -136,6 +137,53 @@ export async function loadImageClassifierModel(options: {
     return { x, y, classCounts }
   }
 
+  async function loadTestDatasetFromDirectory() {
+  if (!testDatasetDir) {
+    throw new Error('testDatasetDir not provided')
+  }
+  let xs: tf.Tensor[] = []
+  let classIndices: number[] = []
+  let classCounts: number[] = new Array(classCount).fill(0)
+
+  let total = 0
+  let classes = await Promise.all(
+    classNames!.map(async (className, classIdx) => {
+      let dir = join(testDatasetDir, className)
+      let filenames = await getDirFilenames(dir)
+      total += filenames.length
+      return { classIdx, dir, filenames }
+    }),
+  )
+
+  let timer = startTimer('load dataset')
+  timer.setEstimateProgress(total)
+  for (let { classIdx, dir, filenames } of classes) {
+    for (let filename of filenames) {
+      let file = join(dir, filename)
+      let embedding = await baseModel.imageFileToEmbedding(file)
+      xs.push(embedding)
+      classIndices.push(classIdx)
+      classCounts[classIdx]++
+      timer.tick()
+    }
+  }
+  timer.end()
+
+  let x = tf.concat(xs)
+
+  if (!baseModel.fileEmbeddingCache) {
+    for (let x of xs) {
+      x.dispose()
+    }
+  }
+
+  let y = tf.tidy(() =>
+    tf.oneHot(tf.tensor1d(classIndices, 'int32'), classCount),
+  )
+
+  return { x_test: x, y_test: y, classCounts_test: classCounts }
+  }
+
   async function train(
     options?: tf.ModelFitArgs &
       (
@@ -196,6 +244,24 @@ export async function loadImageClassifierModel(options: {
       dir,
       classNames,
     })
+  }
+
+  async function evaluate(x_test: tf.Tensor<tf.Rank>, y_test: tf.Tensor<tf.Rank>) {
+    const predictions = await Promise.all(
+      tf.unstack(x_test).map(async (tensor) => {
+        const results = await classifyImageEmbedding(tensor.expandDims(0));
+        return results.map(result => result.confidence);
+    }));
+    const predTensor = tf.tensor2d(predictions, [predictions.length, classNames!.length]);
+    
+    const loss = tf.metrics.categoricalCrossentropy(y_test, predTensor).mean();
+    const accuracy = tf.metrics.categoricalAccuracy(y_test, predTensor).mean();
+
+    return {
+      loss: await loss.data(),
+      accuracy: await accuracy.data(),
+      dispose: () => predTensor.dispose()
+    };
   }
 
   return {
