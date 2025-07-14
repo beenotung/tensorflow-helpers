@@ -1,4 +1,4 @@
-import * as tf from '@tensorflow/tfjs-node'
+import * as tf from '@tensorflow/tfjs'
 import { Tensor } from '@tensorflow/tfjs'
 import { getLastSpatialNodeName } from './spatial-utils'
 import { PreTrainedImageModels } from './image-model'

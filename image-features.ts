@@ -1,9 +1,9 @@
-import { Tensor } from '@tensorflow/tfjs-node'
+import { Tensor } from '@tensorflow/tfjs'
 import { ImageModel } from './model'
 import { getLastSpatialNodeName } from './spatial-utils'
 
 export async function getImageFeatures(options: {
-  tf: typeof import('@tensorflow/tfjs-node')
+  tf: typeof import('@tensorflow/tfjs')
   imageModel: ImageModel
   image: string | Tensor
   /** default: 'Identity:0' */
