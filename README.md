@@ -81,6 +81,7 @@ import {
   loadImageModel,
   loadImageClassifierModel,
   PreTrainedImageModels,
+  topClassifyResult,
 } from 'tensorflow-helpers'
 
 // auto cache locally
@@ -110,8 +111,8 @@ let history = await classifier.train({
 await classifier.save()
 
 // auto load image from filesystem, resize and crop
-let classes = await classifier.classifyAsync('image.jpg')
-let topClass = topClassificationResult(classes)
+let classes = await classifier.classifyImageFile('image.jpg')
+let topClass = topClassifyResult(classes)
 
 console.log('result:', topClass)
 // [print] result: { label: 'anime', confidence: 0.7991582155227661 }
