@@ -272,9 +272,9 @@ function isContentHash(url: string): boolean {
 
 function isHexOnly(str: string) {
   for (let char of str) {
-    if (str >= '0' && str <= '9') continue
-    if (str >= 'A' && str <= 'F') continue
-    if (str >= 'a' && str <= 'f') continue
+    if (char >= '0' && char <= '9') continue
+    if (char >= 'A' && char <= 'F') continue
+    if (char >= 'a' && char <= 'f') continue
     return false
   }
   return true
