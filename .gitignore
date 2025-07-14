@@ -10,5 +10,8 @@ dist/
 .DS_Store
 dataset/
 saved_model/
+saved_models/
 image.jpg
 bundle.js
+data.json
+*-data.json

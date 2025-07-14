@@ -8,6 +8,7 @@ Helper functions to use tensorflow in nodejs/browser for transfer learning, imag
 
 - Support transfer learning and continuous learning
 - Custom image classifier using embedding features from pre-trained image model
+- Extract both spatial and pooled features from image models
 - Correctly save/load model on filesystem[1]
 - Load image file into tensor with resize and crop
 - List varies pre-trained models (url, image dimension, embedding size)
@@ -34,8 +35,9 @@ See [model.test.ts](./model.test.ts) and [classifier.test.ts](./classifier.test.
 
 ```typescript
 import {
-  loadImageClassifierModel,
   loadImageModel,
+  getImageFeatures,
+  loadImageClassifierModel,
   toOneTensor,
 } from 'tensorflow-helpers/browser'
 
@@ -59,16 +61,20 @@ async function main() {
     let file = fileInput.files?.[0]
     if (!file) return
 
-    /* load from file directly */
-    let result1 = await classifier.classifyImageFile(file)
-    // result1 is Array<{ label: string, confidence: number }>
+    // Extract both spatial and pooled features
+    let features = await getImageFeatures({
+      tf,
+      imageModel: baseModel,
+      image: file,
+    })
+    console.log('spatial features shape:', features.spatialFeatures.shape) // [1, 7, 7, 160]
+    console.log('pooled features shape:', features.pooledFeatures.shape) // [1, 1280]
 
-    /* load from embedding tensor */
-    let embeddingTensor = await baseModel.imageFileToEmbedding(file)
-    let embeddingFeatures = toOneTensor(embeddingTensor).dataSync()
-    // embeddingFeatures is Float32Array
-
-    let result1 = await classifier.classifyImageEmbedding(embeddingTensor)
+    // Classify the image
+    let result = await classifier.classifyImageFile(file)
+    // classifyImageFile handles end-to-end classification: auto-resize image → extract features → classify
+    console.log('classification result:', result)
+    // result is Array<{ label: string, confidence: number }> - e.g. [{ label: 'anime', confidence: 0.8 }, ...]
   }
 }
 main().catch(e => console.error(e))
@@ -79,12 +85,13 @@ main().catch(e => console.error(e))
 ```typescript
 import {
   loadImageModel,
-  loadImageClassifierModel,
   PreTrainedImageModels,
+  getImageFeatures,
+  loadImageClassifierModel,
   topClassifyResult,
 } from 'tensorflow-helpers'
 
-// auto cache locally
+// Load pre-trained base model
 let baseModel = await loadImageModel({
   spec: PreTrainedImageModels.mobilenet['mobilenet-v3-large-100'],
   dir: 'saved_model/base_model',
@@ -92,7 +99,16 @@ let baseModel = await loadImageModel({
 console.log('embedding features:', baseModel.spec.features)
 // [print] embedding features: 1280
 
-// restore or create new model
+// Extract both spatial and pooled features
+let features = await getImageFeatures({
+  tf,
+  imageModel: baseModel,
+  image: 'image.jpg',
+})
+console.log('spatial features shape:', features.spatialFeatures.shape) // [1, 7, 7, 160]
+console.log('pooled features shape:', features.pooledFeatures.shape) // [1, 1280]
+
+// Create classifier for image classification
 let classifier = await loadImageClassifierModel({
   baseModel,
   modelDir: 'saved_model/classifier_model',
@@ -395,6 +411,30 @@ export function mapWithClassName(
 </details>
 
 <details>
+<summary>Feature extraction functions</summary>
+
+```typescript
+export async function getImageFeatures(options: {
+  tf: typeof import('@tensorflow/tfjs-node')
+  imageModel: ImageModel
+  image: string | Tensor
+  /** default: 'Identity:0' */
+  outputNode?: string
+}): Promise<{
+  spatialFeatures: Tensor // e.g. [1, 7, 7, 160] - spatial feature map
+  pooledFeatures: Tensor // e.g. [1, 1280] - global average pooled features
+}>
+
+/**
+ * @description Get the name of the last spatial node in the model
+ * Used internally by getImageFeatures to extract spatial features
+ */
+export function getLastSpatialNodeName(model: GraphModel): string
+```
+
+</details>
+
+<details>
 <summary>Model helper functions</summary>
 
 ```typescript
@@ -574,6 +614,24 @@ export function loadImageClassifierModel(options: {
   checkForUpdates?: boolean
   classNames: string[]
 }): Promise<ClassifierModel>
+```
+
+</details>
+
+<details>
+<summary>(Browser version) feature extraction functions</summary>
+
+```typescript
+export async function getImageFeatures(options: {
+  tf: typeof import('@tensorflow/tfjs-core')
+  imageModel: ImageModel
+  image: string | Tensor
+  /** default: 'Identity:0' */
+  outputNode?: string
+}): Promise<{
+  spatialFeatures: Tensor // e.g. [1, 7, 7, 160] - spatial feature map
+  pooledFeatures: Tensor // e.g. [1, 1280] - global average pooled features
+}>
 ```
 
 </details>
