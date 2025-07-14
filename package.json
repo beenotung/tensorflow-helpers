@@ -42,17 +42,22 @@
   },
   "dependencies": {
     "@beenotung/tslib": "^24.6.2",
-    "@tensorflow/tfjs": "^4.22.0"
+    "@tensorflow/tfjs": "^4.22.0",
+    "sharp": "^0.34.2"
   },
   "peerDependencies": {
     "@tensorflow/tfjs": "^4.22.0",
-    "@tensorflow/tfjs-core": "^4.21.0"
+    "@tensorflow/tfjs-core": "^4.21.0",
+    "sharp": "^0.34.2"
   },
   "peerDependenciesMeta": {
     "@tensorflow/tfjs": {
       "optional": true
     },
     "@tensorflow/tfjs-core": {
+      "optional": true
+    },
+    "sharp": {
       "optional": true
     }
   },
@@ -63,6 +68,7 @@
     "mk-package": "^1.0.2",
     "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
+    "sharp": "^0.34.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.3"
