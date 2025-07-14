@@ -101,7 +101,7 @@ let classifier = await loadImageClassifierModel({
 })
 
 // auto load training dataset
-let history = await classifier.trainAsync({
+let history = await classifier.train({
   epochs: 5,
   batchSize: 32,
 })
@@ -362,7 +362,7 @@ export type ClassifierModel = {
     y: tf.Tensor<tf.Rank>
   }>
   compile: () => void
-  trainAsync: (options?: tf.ModelFitArgs) => Promise<tf.History>
+  train: (options?: tf.ModelFitArgs) => Promise<tf.History>
   save: (dir?: string) => Promise<SaveResult>
 }
 
