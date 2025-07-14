@@ -1,11 +1,12 @@
 import * as tf from '@tensorflow/tfjs'
 import { ModelArtifacts } from '@tensorflow/tfjs-core/dist/io/types'
+import { getLastSpatialNodeName } from '../spatial-utils'
 import {
   CropAndResizeAspectRatio,
   ImageTensor,
   cropAndResizeImageTensor,
 } from '../image-utils'
-import { ImageModelSpec } from '../image-model'
+import { ImageModelSpec, SpatialFeatures } from '../image-model'
 import { toOneTensor } from '../tensor'
 import {
   attachClassNames,
@@ -253,6 +254,17 @@ function getModelSpec(url: string, model: tf.GraphModel) {
     features,
   }
 
+  try {
+    let name = getLastSpatialNodeName(model)
+    tf.tidy(() => {
+      let input = tf.zeros([1, height, width, channels])
+      let output = model.execute(input, [name]) as tf.Tensor
+      spec.spatial_features = output.shape as SpatialFeatures
+    })
+  } catch (error) {
+    // e.g. no spatial node
+  }
+
   return spec
 }
 
@@ -305,7 +317,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
         cacheUrl: options.cacheUrl,
         checkForUpdates: options.checkForUpdates,
       })
-    : await tf.loadGraphModel(options.url)
+    : await tf.loadGraphModel(removeModelUrlPrefix(options.url) + '/model.json')
   let spec = getModelSpec(options.url, model)
   let { width, height, channels } = spec
 

@@ -61,6 +61,7 @@
     "@types/node": "^22.14.0",
     "esbuild": "^0.24.2",
     "mk-package": "^1.0.2",
+    "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
