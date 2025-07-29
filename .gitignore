@@ -8,7 +8,6 @@ dist/
 .env
 *.tgz
 .DS_Store
-dataset/
 saved_model/
 saved_models/
 image.jpg

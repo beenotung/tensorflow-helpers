@@ -10,6 +10,10 @@ export * from './model-utils'
 export * from './spatial-utils'
 export * from './tensor'
 export * from './file'
+export * from './fs'
+export * from './dataset/label'
+export * from './dataset/preview'
+export * from './dataset/yaml'
 
 export let tensorflow = tfjs
 export let tf = tensorflow
