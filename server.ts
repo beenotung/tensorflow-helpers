@@ -51,6 +51,8 @@ app.use(
   '/saved_models/classifier_model',
   express.static(config.classifierModelDir),
 )
+app.use('/saved_models', express.static('./saved_models'));
+app.use('/confusion', express.static('./confusion'));
 app.use(express.static(resolveFile('public')))
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
