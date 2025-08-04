@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Graph Image Editor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <h1>📊 Graph Image Editor</h1>
+        <p>Import, edit, and annotate graph images with interactive shapes</p>
+      </header>
+
+      <!-- Image Import Section with inline tools -->
+      <section class="import-section">
+        <div class="import-and-tools-row">
+          <!-- Import Card -->
+          <div class="import-card">
+            <h2>🖼️ Import Graph Image</h2>
+            <div class="import-options">
+              <div class="import-option">
+                <label for="file-upload" class="upload-btn">
+                  📁 Upload File
+                  <input type="file" id="file-upload" accept="image/*" hidden />
+                </label>
+              </div>
+              <div class="import-option">
+                <div class="url-input-group">
+                  <input
+                    type="url"
+                    id="url-input"
+                    placeholder="Enter image URL..."
+                    class="url-input"
+                  />
+                  <button id="url-load-btn" class="load-btn">Load</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Shape Tools Card -->
+          <div class="tool-card">
+            <h2>🔧 Shape Tools</h2>
+            <div class="shape-grid">
+              <button class="shape-btn" data-shape="square" title="Square">
+                <div class="shape-icon square-icon"></div>
+                <span>Square</span>
+              </button>
+              <button class="shape-btn" data-shape="rectangle" title="Rectangle">
+                <div class="shape-icon rectangle-icon"></div>
+                <span>Rectangle</span>
+              </button>
+              <button class="shape-btn" data-shape="triangle" title="Triangle">
+                <div class="shape-icon triangle-icon"></div>
+                <span>Triangle</span>
+              </button>
+              <button class="shape-btn" data-shape="circle" title="Circle">
+                <div class="shape-icon circle-icon"></div>
+                <span>Circle</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Export Card -->
+          <div class="tool-card">
+            <h2>💾 Export</h2>
+            <div class="export-options">
+              <div class="format-selection">
+                <label class="radio-label">
+                  <input type="radio" name="export-format" value="png" checked />
+                  <span>PNG</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="export-format" value="jpeg" />
+                  <span>JPEG</span>
+                </label>
+              </div>
+              <button id="save-btn" class="save-btn">💾 Save</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Main Editor Layout -->
+      <div class="editor-layout">
+        <!-- Dual Canvas Area -->
+        <div class="dual-canvas-container">
+          <!-- Left Canvas - Grid Classification -->
+          <div class="canvas-section">
+            <div class="canvas-header">
+              <h3>7×7 Grid Classification</h3>
+            </div>
+            <div class="canvas-area original-canvas">
+              <div class="canvas-wrapper">
+                <div class="canvas-container" id="original-canvas-container">
+                  <canvas id="original-canvas" width="600" height="420"></canvas>
+                  <div class="canvas-overlay">
+                    <div class="drop-zone" id="drop-zone">
+                      <div class="drop-message">
+                        <span class="drop-icon">📤</span>
+                        <p>Drop an image here to load it</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Grid Controls -->
+                <div class="grid-controls-bottom">
+                  <h4>Grid Display Settings</h4>
+                  <div class="grid-control-row">
+                    <div class="control-group-inline">
+                      <label for="grid-line-color">Grid Color:</label>
+                      <input type="color" id="grid-line-color" value="#3b82f6" class="grid-color-picker">
+                    </div>
+                    <div class="control-group-inline">
+                      <label for="grid-text-color">Text Color:</label>
+                      <input type="color" id="grid-text-color" value="#ffffff" class="grid-color-picker">
+                    </div>
+                  </div>
+                  <div class="grid-control-row">
+                    <div class="control-group-inline">
+                      <label for="grid-text-size">Text Size:</label>
+                      <input type="range" id="grid-text-size" min="8" max="20" value="10" class="text-size-slider">
+                      <span id="grid-text-size-value">10px</span>
+                    </div>
+                  </div>
+                  <div class="grid-control-row">
+                    <div class="control-group-inline">
+                      <label for="feat-num-input">Feature number:</label>
+                      <input type="number" id="feat-num-input" min="0" max="159" step="1" value="0" class="text-input-small">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Canvas - Shape Editor with Grid -->
+          <div class="canvas-section">
+            <div class="canvas-header">
+              <h3>✏️ Shape Editor</h3>
+            </div>
+            <div class="canvas-area editor-canvas">
+              <div class="canvas-wrapper">
+                <div class="canvas-container" id="editor-canvas-container">
+                  <canvas id="editor-canvas" width="600" height="420"></canvas>
+                </div>
+                <div class="canvas-info">
+                  <div class="info-item">
+                    <span class="info-label">Grid:</span>
+                    <span id="grid-size">7 × 7</span>
+                  </div>
+                  <div class="info-item">
+                    <span class="info-label">Mouse:</span>
+                    <span id="mouse-coords">x: 0, y: 0</span>
+                  </div>
+                </div>
+                <!-- Shape Controls -->
+                <div class="shape-controls-bottom">
+                  <h4>Shape Settings</h4>
+                  
+                  <!-- Color Control -->
+                  <div class="grid-control-row">
+                    <div class="control-group-inline">
+                      <label for="shape-color">Color:</label>
+                      <input type="color" id="color-picker" value="#ffffff" class="grid-color-picker">
+                    </div>
+                    <div class="control-group-inline" id="height-control-bottom" style="display: none">
+                      <label>
+                        <input type="checkbox" id="lock-ratio-checkbox" checked>
+                        Lock Ratio
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Properties (Text inputs only) -->
+                  <div class="grid-control-row">
+                    <div class="control-group-inline">
+                      <label for="size-input-bottom">Size:</label>
+                      <input type="number" id="size-input-bottom" min="0.2" max="3" step="0.1" value="1" class="text-input-small">
+                    </div>
+                    <div class="control-group-inline" id="width-control-bottom" style="display: none">
+                      <label for="width-input-bottom">Width:</label>
+                      <input type="number" id="width-input-bottom" min="20" max="400" step="5" value="120" class="text-input-small">
+                    </div>
+                  </div>
+                  
+                  <div class="grid-control-row">
+                    <div class="control-group-inline" id="height-control-bottom" style="display: none">
+                      <label for="height-input-bottom">Height:</label>
+                      <input type="number" id="height-input-bottom" min="20" max="400" step="5" value="80" class="text-input-small">
+                    </div>
+                    <div class="control-group-inline" id="rotation-control-bottom">
+                      <label for="rotation-input-bottom">Rotation:</label>
+                      <input type="number" id="rotation-input-bottom" min="0" max="360" step="1" value="0" class="text-input-small">
+                    </div>
+                  </div>
+
+                  <!-- Clear Shape Button -->
+                  <div class="grid-control-row">
+                    <button id="clear-shape-btn" class="clear-btn-small">🗑️ Clear Shape</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Bar -->
+      <footer class="status-bar">
+        <div class="status-content">
+          <span class="status-indicator" id="status-indicator">●</span>
+          <span id="status-text">Ready - Import an image to get started</span>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Load the TypeScript compiled JavaScript -->
+    <script src="app.js"></script>
+  </body>
+</html>

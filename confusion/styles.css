@@ -1,0 +1,1026 @@
+/* ========================================
+   MODERN CSS RESET AND BASE STYLES
+======================================== */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ========================================
+   CSS CUSTOM PROPERTIES (DESIGN TOKENS)
+======================================== */
+:root {
+  /* COLORS - Primary Palette */
+  --primary-color: #3b82f6;
+  --primary-hover: #2563eb;
+  --secondary-color: #64748b;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  
+  /* COLORS - Surface & Background */
+  --background: #f8fafc;
+  --surface-white: #ffffff;        /* Bright white for canvases */
+  --surface-light: #f8fafc;        /* Very light gray for app background */
+  --surface-hover: #f1f5f9;        /* Light hover state */
+  
+  /* COLORS - Borders */
+  --border: #e2e8f0;
+  --border-focus: #3b82f6;
+  
+  /* COLORS - Text */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-light: #94a3b8;
+  
+  /* SHADOWS */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  
+  /* BORDER RADIUS */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+/* ========================================
+   GLOBAL BODY STYLES
+======================================== */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  background: var(--surface-light);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ========================================
+   APP CONTAINER AND LAYOUT
+======================================== */
+.app-container {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ========================================
+   HEADER SECTION
+======================================== */
+.app-header {
+  text-align: center;
+  padding: 2rem 0;
+  background: var(--surface-white);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+
+.app-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+}
+
+.app-header p {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ========================================
+   IMPORT SECTION AND TOOLS
+======================================== */
+.import-section {
+  margin-bottom: 1rem;
+}
+
+.import-and-tools-row {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.import-card, 
+.tool-card {
+  background: var(--surface-white);
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+  flex: 1;
+  min-width: 250px;
+}
+
+.import-card h2, 
+.tool-card h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.import-options {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.import-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ========================================
+   FORM CONTROLS AND BUTTONS
+======================================== */
+.upload-btn {
+  background: var(--primary-color);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.upload-btn:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.url-input-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.url-input {
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  width: 300px;
+  transition: border-color 0.2s ease;
+  background: var(--surface-white);
+}
+
+.url-input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.load-btn {
+  background: var(--success-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.load-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.predefined-select {
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-white);
+  cursor: pointer;
+  font-size: 0.875rem;
+  min-width: 200px;
+}
+
+/* ========================================
+   MAIN EDITOR LAYOUT
+======================================== */
+.editor-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-height: 600px;
+}
+
+/* ========================================
+   DUAL CANVAS CONTAINER - MAIN FEATURE
+======================================== */
+.dual-canvas-container {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+  min-height: 500px;
+}
+
+.canvas-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Canvas Headers */
+.canvas-header {
+  background: var(--surface-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.canvas-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Grid Controls in Header */
+.grid-controls {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.control-group-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.control-group-inline label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.grid-color-picker {
+  width: 30px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ========================================
+   CANVAS CONTAINERS - BRIGHT WHITE BACKGROUNDS
+======================================== */
+/* Canvas Areas - Main containers */
+.canvas-area {
+  flex: 1;
+  background: var(--surface-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  min-height: 400px;
+}
+
+/* Canvas Wrappers */
+.canvas-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-white);
+}
+
+/* Canvas Containers - BRIGHT WHITE for equal brightness */
+.canvas-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  background: var(--surface-white); /* BRIGHT WHITE - No gray tones */
+  min-height: 350px;
+  padding: 1.5rem;
+}
+
+/* Specific Canvas Container Classes */
+.original-canvas {
+  background: var(--surface-white); /* Bright white background */
+}
+
+.editor-canvas {
+  background: var(--surface-white); /* Bright white background */
+  position: relative;
+}
+
+/* ========================================
+   CANVAS ELEMENTS - CONSISTENT STYLING
+======================================== */
+#original-canvas, 
+#editor-canvas {
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  transition: transform 0.2s ease;
+  background: var(--surface-white); /* Ensure bright white background */
+}
+
+#original-canvas {
+  cursor: default;
+}
+
+#editor-canvas {
+  cursor: crosshair;
+}
+
+#original-canvas:hover, 
+#editor-canvas:hover {
+  transform: scale(1.01);
+}
+
+#editor-canvas.dragging {
+  cursor: grabbing;
+}
+
+/* ========================================
+   GRID OVERLAY (HIDDEN BY DEFAULT)
+======================================== */
+.editor-canvas .grid-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+  display: none; /* Hidden - dots removed */
+  align-items: center;
+  justify-content: center;
+}
+
+.editor-canvas .grid-dots {
+  width: 540px;
+  height: 378px;
+  background-image: radial-gradient(circle at center, var(--primary-color) 2px, transparent 2px);
+  background-size: 90px 63px;
+  background-position: 45px 31.5px;
+  opacity: 0.4;
+  border-radius: 8px;
+}
+
+/* ========================================
+   DRAG AND DROP OVERLAY
+======================================== */
+.canvas-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.canvas-overlay.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.drop-zone {
+  position: absolute;
+  top: 2rem;
+  left: 2rem;
+  right: 2rem;
+  bottom: 2rem;
+  border: 3px dashed var(--primary-color);
+  border-radius: var(--radius-lg);
+  background: rgba(59, 130, 246, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drop-message {
+  text-align: center;
+  color: var(--primary-color);
+}
+
+.drop-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.drop-message p {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+/* ========================================
+   CANVAS INFO BAR
+======================================== */
+.canvas-info {
+  background: var(--surface-hover);
+  border-top: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.info-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* ========================================
+   CONTROL PANELS AND TOOLBARS
+======================================== */
+/* Grid Controls Bottom Panel */
+.grid-controls-bottom {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--surface-white);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.grid-controls-bottom h4 {
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.grid-control-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.grid-control-row:last-child {
+  margin-bottom: 0;
+}
+
+.text-size-slider {
+  width: 100px;
+  margin: 0 0.5rem;
+}
+
+#grid-text-size-value {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  min-width: 30px;
+}
+
+/* Shape Controls Bottom Panel */
+.shape-controls-bottom {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--surface-white);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.shape-controls-bottom h4 {
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.text-input-small {
+  width: 60px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  text-align: center;
+  background: var(--surface-white);
+}
+
+.clear-btn-small {
+  background: var(--error-color);
+  color: white;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.clear-btn-small:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+/* Bottom Toolbar */
+.bottom-toolbar {
+  display: flex;
+  gap: 1.5rem;
+  background: var(--surface-white);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 100%;
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+}
+
+.tool-panel {
+  background: var(--surface-white);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+  min-width: 280px;
+  flex-shrink: 0;
+}
+
+.tool-panel h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ========================================
+   SHAPE CONTROLS
+======================================== */
+.shape-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.shape-btn {
+  background: var(--surface-white);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.shape-btn:hover {
+  border-color: var(--primary-color);
+  background: var(--surface-hover);
+  transform: translateY(-1px);
+}
+
+.shape-btn.active {
+  border-color: var(--primary-color);
+  background: var(--primary-color);
+  color: white;
+}
+
+/* Shape Icons */
+.shape-icon {
+  width: 24px;
+  height: 24px;
+  border: 2px solid currentColor;
+}
+
+.square-icon {
+  border-radius: 2px;
+}
+
+.rectangle-icon {
+  width: 32px;
+  height: 20px;
+  border-radius: 2px;
+}
+
+.triangle-icon {
+  width: 0;
+  height: 0;
+  border: none;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 20px solid currentColor;
+}
+
+.circle-icon {
+  border-radius: 50%;
+}
+
+/* Control Groups */
+.control-group {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--surface-hover);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.control-label {
+  display: block;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.control-input-group {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* ========================================
+   FORM INPUTS AND SLIDERS
+======================================== */
+.slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: var(--shadow-sm);
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: var(--shadow-sm);
+}
+
+.number-input {
+  width: 80px;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 0.875rem;
+  background: var(--surface-white);
+}
+
+/* ========================================
+   COLOR CONTROLS
+======================================== */
+.color-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.color-picker {
+  width: 60px;
+  height: 40px;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.color-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.color-preset {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.color-preset:hover {
+  transform: scale(1.1);
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-md);
+}
+
+/* ========================================
+   BUTTONS
+======================================== */
+.clear-btn {
+  background: var(--error-color);
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.clear-btn:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.save-btn {
+  background: var(--success-color);
+  color: white;
+  border: none;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.save-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* ========================================
+   EXPORT OPTIONS
+======================================== */
+.export-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.format-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.radio-label input[type='radio'] {
+  accent-color: var(--primary-color);
+}
+
+/* ========================================
+   STATUS BAR
+======================================== */
+.status-bar {
+  background: var(--surface-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.status-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.status-indicator {
+  font-size: 0.75rem;
+  color: var(--success-color);
+}
+
+.status-indicator.loading {
+  color: var(--warning-color);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-indicator.error {
+  color: var(--error-color);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+#status-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+======================================== */
+@media (max-width: 1200px) {
+  .dual-canvas-container {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .bottom-toolbar {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .tool-panel {
+    min-width: unset;
+  }
+
+  .sidebar {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 1rem;
+  }
+
+  .app-header h1 {
+    font-size: 2rem;
+  }
+
+  .import-options {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .import-option {
+    justify-content: center;
+  }
+
+  .url-input {
+    width: 100%;
+  }
+
+  .shape-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dual-canvas-container {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .canvas-container {
+    padding: 1rem;
+    min-height: 300px;
+  }
+
+  .canvas-info {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .bottom-toolbar {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .editor-canvas .grid-dots {
+    width: 360px;
+    height: 252px;
+    background-size: 60px 42px;
+    background-position: 30px 21px;
+  }
+
+  .sidebar {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header h1 {
+    font-size: 1.75rem;
+  }
+
+  .import-card {
+    padding: 1.5rem;
+  }
+
+  .tool-panel {
+    padding: 1rem;
+  }
+
+  .canvas-container {
+    padding: 0.5rem;
+    min-height: 350px;
+  }
+}
+
+/* ========================================
+   UTILITY CLASSES AND ANIMATIONS
+======================================== */
+.hidden {
+  display: none !important;
+}
+
+.loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
