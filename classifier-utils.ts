@@ -21,12 +21,13 @@ export function createImageClassifier(spec: ClassifierModelSpec) {
   classifierModel.add(
     tf.layers.inputLayer({ inputShape: [spec.embeddingFeatures] }),
   )
-  classifierModel.add(tf.layers.dropout({ rate: 0.2 }))
+  classifierModel.add(tf.layers.dropout({ rate: 0.5 }))
   if (hiddenLayers) {
     for (let i = 0; i < hiddenLayers.length; i++) {
       classifierModel.add(
         tf.layers.dense({ units: hiddenLayers[i], activation: 'gelu' }),
       )
+      classifierModel.add(tf.layers.dropout({ rate: 0.5 }))
     }
   }
   classifierModel.add(
