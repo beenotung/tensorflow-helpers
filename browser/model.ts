@@ -317,6 +317,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
   checkForUpdates?: boolean
   aspectRatio?: CropAndResizeAspectRatio
   cache?: Cache | boolean
+  classNames?: string[]
 }) {
   let { aspectRatio, cache } = options
 
@@ -325,8 +326,12 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
         url: options.url,
         cacheUrl: options.cacheUrl,
         checkForUpdates: options.checkForUpdates,
+        classNames: options.classNames,
       })
-    : await tf.loadGraphModel(removeModelUrlPrefix(options.url) + '/model.json')
+    : await loadGraphModel({
+        url: options.url,
+        classNames: options.classNames,
+      })
   let spec = getModelSpec(options.url, model)
   let { width, height, channels } = spec
 
