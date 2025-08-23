@@ -1,35 +1,91 @@
-import { ImageModel } from './model'
+import { ImageModel, ImageOrUrl } from './model'
 import { Tensor } from '@tensorflow/tfjs-core'
 import { getLastSpatialNodeName } from '../spatial-utils'
 
+type tf = {
+  tidy: (...args: any[]) => any
+}
+type image = ImageOrUrl
+type node = string | { name: string }
+
+function getName(node: node): string {
+  return typeof node == 'string' ? node : node.name
+}
+
 export async function getImageFeatures(options: {
-  tf: typeof import('@tensorflow/tfjs-core')
+  tf: tf
   imageModel: ImageModel
-  image: string | Tensor
+  image: image
   /** default: 'Identity:0' */
   outputNode?: string
-}) {
+  /** default: getLastSpatialNodeName(model) */
+  spatialNode?: node
+}): Promise<{
+  /** e.g. `[1 x 7 x 7 x 160]` */
+  spatialFeatures: Tensor
+  /** e.g. `[1 x 1280]` */
+  pooledFeatures: Tensor
+}>
+export async function getImageFeatures(options: {
+  tf: tf
+  imageModel: ImageModel
+  image: image
+  /** default: 'Identity:0' */
+  outputNode?: string
+  /** e.g. `imageModel.spatialNodesWithUniqueShapes` */
+  spatialNodes: node[]
+}): Promise<{
+  /**
+   * e.g.
+   * ```
+   * [
+   *   [1 x 56 x 56 x 24],
+   *   [1 x 28 x 28 x 40],
+   *   [1 x 14 x 14 x 80],
+   *   [1 x 14 x 14 x 112],
+   *   [1 x 7 x 7 x 160],
+   * ]
+   * ```
+   *  */
+  spatialFeatures: Tensor[]
+  /** e.g. `[1 x 1280]` */
+  pooledFeatures: Tensor
+}>
+export async function getImageFeatures(options: {
+  tf: tf
+  imageModel: ImageModel
+  image: image
+  /** default: 'Identity:0' */
+  outputNode?: string
+  /** default: getLastSpatialNodeName(model) */
+  spatialNodes?: node[] | node
+}): Promise<{
+  spatialFeatures: Tensor[] | Tensor
+  pooledFeatures: Tensor
+}> {
   let { tf, imageModel, image } = options
   let model = imageModel.model
+  let spatialNodes = options.spatialNodes || getLastSpatialNodeName(model)
 
-  let spatialNode = getLastSpatialNodeName(model)
   let outputNode = options.outputNode || 'Identity:0'
-  let names = [spatialNode, outputNode]
+  let names: string[] = Array.isArray(spatialNodes)
+    ? [...spatialNodes.map(getName), outputNode]
+    : [getName(spatialNodes), outputNode]
 
-  let input =
-    typeof image == 'string' ? await imageModel.loadImageCropped(image) : image
+  let input = await imageModel.loadImageCropped(image)
 
-  // e.g. shape: [1, 7, 7, 160]
   let output = tf.tidy(() => model.execute(input, names) as Tensor[])
 
   if (typeof image == 'string') {
     input.dispose()
   }
 
-  /** e.g. 7 x 7 x 160 */
-  let spatialFeatures = output[0]
-  /** e.g. 1 x 1280 */
-  let pooledFeatures = output[1]
+  let spatialFeatures = Array.isArray(spatialNodes)
+    ? output.slice(0, output.length - 1)
+    : output[0]
+
+  let pooledFeatures = output[output.length - 1]
+
   return {
     spatialFeatures,
     pooledFeatures,
