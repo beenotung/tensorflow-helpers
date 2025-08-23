@@ -17,6 +17,10 @@ import {
   ModelArtifactsWithClassNames,
   SaveResult,
 } from './classifier-utils'
+import {
+  filterSpatialNodesWithUniqueShapes,
+  getSpatialNodes,
+} from './spatial-utils'
 export { ImageModelSpec, PreTrainedImageModels } from './image-model'
 
 export type Model = tf.GraphModel | tf.LayersModel
@@ -280,6 +284,11 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     })
   }
 
+  let spatialNodes = getSpatialNodes({ model, tf })
+  let spatialNodesWithUniqueShapes =
+    filterSpatialNodesWithUniqueShapes(spatialNodes)
+  let lastSpatialNode = spatialNodesWithUniqueShapes.slice().pop()
+
   return {
     spec,
     model,
@@ -288,5 +297,8 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     loadImageCropped,
     imageFileToEmbedding,
     imageTensorToEmbedding,
+    spatialNodes,
+    spatialNodesWithUniqueShapes,
+    lastSpatialNode,
   }
 }
