@@ -5,7 +5,7 @@ import { getLastSpatialNodeName } from './spatial-utils'
 type tf = {
   tidy: (...args: any[]) => any
 }
-
+type image = string | Tensor
 type node = string | { name: string }
 
 function getName(node: node): string {
@@ -15,7 +15,7 @@ function getName(node: node): string {
 export async function getImageFeatures(options: {
   tf: tf
   imageModel: ImageModel
-  image: string | Tensor
+  image: image
   /** default: 'Identity:0' */
   outputNode?: string
   /** default: getLastSpatialNodeName(model) */
@@ -29,7 +29,7 @@ export async function getImageFeatures(options: {
 export async function getImageFeatures(options: {
   tf: tf
   imageModel: ImageModel
-  image: string | Tensor
+  image: image
   /** default: 'Identity:0' */
   outputNode?: string
   /** e.g. `imageModel.spatialNodesWithUniqueShapes` */
@@ -54,7 +54,7 @@ export async function getImageFeatures(options: {
 export async function getImageFeatures(options: {
   tf: tf
   imageModel: ImageModel
-  image: string | Tensor
+  image: image
   /** default: 'Identity:0' */
   outputNode?: string
   /** default: getLastSpatialNodeName(model) */
