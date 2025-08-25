@@ -21,9 +21,9 @@ export async function getImageFeatures(options: {
   /** default: getLastSpatialNodeName(model) */
   spatialNode?: node
 }): Promise<{
-  /** e.g. `[1 x 7 x 7 x 160]` */
+  /** e.g. `[1 x 7 x 7 x 160]` spatial feature map */
   spatialFeatures: Tensor
-  /** e.g. `[1 x 1280]` */
+  /** e.g. `[1 x 1280]` global average pooled features */
   pooledFeatures: Tensor
 }>
 export async function getImageFeatures(options: {
@@ -48,7 +48,7 @@ export async function getImageFeatures(options: {
    * ```
    *  */
   spatialFeatures: Tensor[]
-  /** e.g. `[1 x 1280]` */
+  /** e.g. `[1 x 1280]` global average pooled features */
   pooledFeatures: Tensor
 }>
 export async function getImageFeatures(options: {
@@ -57,15 +57,16 @@ export async function getImageFeatures(options: {
   image: image
   /** default: 'Identity:0' */
   outputNode?: string
-  /** default: getLastSpatialNodeName(model) */
-  spatialNodes?: node[] | node
+  spatialNode?: node
+  spatialNodes?: node[]
 }): Promise<{
   spatialFeatures: Tensor[] | Tensor
   pooledFeatures: Tensor
 }> {
   let { tf, imageModel, image } = options
   let model = imageModel.model
-  let spatialNodes = options.spatialNodes || getLastSpatialNodeName(model)
+  let spatialNodes =
+    options.spatialNodes || options.spatialNode || getLastSpatialNodeName(model)
 
   let outputNode = options.outputNode || 'Identity:0'
   let names: string[] = Array.isArray(spatialNodes)
