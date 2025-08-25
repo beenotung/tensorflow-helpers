@@ -57,15 +57,16 @@ export async function getImageFeatures(options: {
   image: image
   /** default: 'Identity:0' */
   outputNode?: string
-  /** default: getLastSpatialNodeName(model) */
-  spatialNodes?: node[] | node
+  spatialNode?: node
+  spatialNodes?: node[]
 }): Promise<{
   spatialFeatures: Tensor[] | Tensor
   pooledFeatures: Tensor
 }> {
   let { tf, imageModel, image } = options
   let model = imageModel.model
-  let spatialNodes = options.spatialNodes || getLastSpatialNodeName(model)
+  let spatialNodes =
+    options.spatialNodes || options.spatialNode || getLastSpatialNodeName(model)
 
   let outputNode = options.outputNode || 'Identity:0'
   let names: string[] = Array.isArray(spatialNodes)

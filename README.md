@@ -621,17 +621,46 @@ export function loadImageClassifierModel(options: {
 <details>
 <summary>(Browser version) feature extraction functions</summary>
 
-```typescript
+````typescript
 export async function getImageFeatures(options: {
   tf: typeof import('@tensorflow/tfjs-core')
   imageModel: ImageModel
   image: string | Tensor
   /** default: 'Identity:0' */
   outputNode?: string
+  /** default: getLastSpatialNodeName(model) */
+  spatialNode?: node
 }): Promise<{
-  spatialFeatures: Tensor // e.g. [1, 7, 7, 160] - spatial feature map
-  pooledFeatures: Tensor // e.g. [1, 1280] - global average pooled features
+  /** e.g. `[1 x 7 x 7 x 160]` spatial feature map */
+  spatialFeatures: Tensor
+  /** e.g. `[1 x 1280]` global average pooled features */
+  pooledFeatures: Tensor
 }>
-```
+export async function getImageFeatures(options: {
+  tf: typeof import('@tensorflow/tfjs-core')
+  imageModel: ImageModel
+  image: string | Tensor
+  /** default: 'Identity:0' */
+  outputNode?: string
+  /** e.g. `imageModel.spatialNodesWithUniqueShapes` */
+  spatialNodes: node[]
+}): Promise<{
+  /** list of spatial feature maps
+   * e.g.
+   * ```
+   * [
+   *   [1 x 56 x 56 x 24],
+   *   [1 x 28 x 28 x 40],
+   *   [1 x 14 x 14 x 80],
+   *   [1 x 14 x 14 x 112],
+   *   [1 x 7 x 7 x 160],
+   * ]
+   * ```
+   *  */
+  spatialFeatures: Tensor[]
+  /** e.g. `[1 x 1280]` global average pooled features */
+  pooledFeatures: Tensor
+}>
+````
 
 </details>
