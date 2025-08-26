@@ -78,7 +78,7 @@ export async function loadGraphModel(options: {
         weights = [weights]
       }
       for (let i = 0; i < weights.length; i++) {
-        weights[i] = await loadWeightData(url + `/weight-${i}.bin`)
+        weights[i] = (await loadWeightData(url + `/weight-${i}.bin`)).buffer
       }
       return modelArtifact
     },
@@ -159,11 +159,13 @@ export async function loadLayersModel(options: {
         throw new Error('missing weightData')
       }
       if (!Array.isArray(weights)) {
-        modelArtifact.weightData = await loadWeightData(url + `/weight-0.bin`)
+        modelArtifact.weightData = (
+          await loadWeightData(url + `/weight-0.bin`)
+        ).buffer
         return modelArtifact
       }
       for (let i = 0; i < weights.length; i++) {
-        weights[i] = await loadWeightData(url + `/weight-${i}.bin`)
+        weights[i] = (await loadWeightData(url + `/weight-${i}.bin`)).buffer
       }
       return modelArtifact
     },
