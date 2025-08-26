@@ -74,7 +74,9 @@ export async function loadGraphModel(options: {
         weights = [weights]
       }
       for (let i = 0; i < weights.length; i++) {
-        weights[i] = await loadWeightData(join(dir, `weight-${i}.bin`))
+        weights[i] = (
+          await loadWeightData(join(dir, `weight-${i}.bin`))
+        ).buffer
       }
       return modelArtifact
     },
@@ -99,13 +101,14 @@ export async function loadLayersModel(options: {
         throw new Error('missing weightData')
       }
       if (!Array.isArray(weights)) {
-        modelArtifact.weightData = await loadWeightData(
-          join(dir, `weight-0.bin`),
-        )
+        const weightArray = await loadWeightData(join(dir, `weight-0.bin`))
+        modelArtifact.weightData = weightArray.buffer
         return modelArtifact
       }
       for (let i = 0; i < weights.length; i++) {
-        weights[i] = await loadWeightData(join(dir, `weight-${i}.bin`))
+        weights[i] = (
+          await loadWeightData(join(dir, `weight-${i}.bin`))
+        ).buffer
       }
       return modelArtifact
     },
