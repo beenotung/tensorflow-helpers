@@ -13,13 +13,18 @@ async function main() {
       dir: `saved_model/${name}`,
     })
     let image = 'image.jpg'
-    let features = await getImageFeatures({ tf, imageModel, image })
+    let features = await getImageFeatures({
+      tf,
+      imageModel,
+      image,
+      spatialNodes: imageModel.spatialNodesWithUniqueShapes,
+    })
 
     writeFileSync(
       `${name}-data.json`,
       JSON.stringify(
         {
-          spatial: features.spatialFeatures.arraySync(),
+          spatial: features.spatialFeatures.map(feature => feature.arraySync()),
           pooled: features.pooledFeatures.arraySync(),
         },
         null,

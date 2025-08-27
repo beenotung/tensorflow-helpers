@@ -304,6 +304,15 @@ export type EmbeddingCache = {
   set(url: string, values: number[]): void
 }
 
+export type ImageOrUrl =
+  | string
+  | tf.PixelData
+  | ImageData
+  | HTMLImageElement
+  | HTMLCanvasElement
+  | HTMLVideoElement
+  | ImageBitmap
+
 export async function loadImageModel<Cache extends EmbeddingCache>(options: {
   url: string
   cacheUrl?: string
@@ -323,19 +332,25 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
   let spec = getModelSpec(options.url, model)
   let { width, height, channels } = spec
 
-  async function loadImageCropped(url: string) {
-    let image = new Image()
-    let p = new Promise((resolve, reject) => {
-      ;(image.onload = resolve),
-        (image.onerror = error =>
+  async function loadImageCropped(image_or_url: ImageOrUrl) {
+    function loadImage() {
+      if (typeof image_or_url != 'string') {
+        return image_or_url
+      }
+      let url = image_or_url
+      return new Promise<HTMLImageElement>((resolve, reject) => {
+        let image = new Image()
+        image.onload = () => resolve(image)
+        image.onerror = error =>
           reject(
             new Error('failed to load image: ' + JSON.stringify(url), {
               cause: error,
             }),
-          ))
-    })
-    image.src = url
-    await p
+          )
+        image.src = url
+      })
+    }
+    let image = await loadImage()
     let imageTensor = tf.browser.fromPixels(image, channels)
     return cropAndResizeImageTensor({
       imageTensor,
