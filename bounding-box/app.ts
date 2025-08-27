@@ -3,6 +3,7 @@ import {
   calcHiddenLayerSize,
   getImageFeatures,
   loadImageModel,
+  loadLayersModel,
   PreTrainedImageModels,
 } from '../browser'
 import * as tf from '@tensorflow/tfjs'
@@ -21,7 +22,8 @@ let COL = spec.spatial_features[2]
 async function loadModels() {
   /* image model: 224x224x3 -> 7x7x160 */
   let baseModel = await loadImageModel({
-    url: spec.url,
+    url: './saved_models/base_model/model.json',
+    // url: spec.url,
     cacheUrl: 'indexeddb://mobilenet-v3-large-100',
     checkForUpdates: false,
   })
@@ -45,6 +47,7 @@ async function loadModels() {
   /* output layer */
   classifierModel.add(tf.layers.dense({ units: 2, activation: 'softmax' }))
 
+  /*2d*/
   let input = tf.input({ shape: spec.spatial_features.slice(1) })
   let hidden = tf.layers
     .conv2d({
@@ -76,6 +79,18 @@ async function checkFile() {
     image.onload = resolve
     image.src = dataUrl
   })
+  let filename = file.name
+  let filePath = './dataset/test/labels/' + filename.replace('.jpg', '.txt')
+  let data
+  try {
+    const response = await fetch(filePath)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${filePath}: ${response.statusText}`)
+    }
+    data = await response.text()
+  } catch (error) {
+    console.error(error)
+  }
   canvas.width = image.naturalWidth
   canvas.height = image.naturalHeight
   context.drawImage(image, 0, 0)
@@ -84,10 +99,10 @@ async function checkFile() {
   let boxWidth = canvas.width / COL
 
   let expected_box: NormalizedBox = {
-    x: 0.65,
-    y: 0.5,
-    width: 0.6,
-    height: 0.5,
+    x: data ? Number(data.split(' ')[1]) : 0,
+    y: data ? Number(data.split(' ')[2]) : 0,
+    width: data ? Number(data.split(' ')[3]) : 0,
+    height: data ? Number(data.split(' ')[4]) : 0,
   }
   let expected_box_width = expected_box.width * canvas.width
   let expected_box_height = expected_box.height * canvas.height
@@ -103,7 +118,10 @@ async function checkFile() {
     bottom: expected_box_bottom,
   }
 
-  let { baseModel, classifierModel2D } = await modelsPromise
+  let { baseModel } = await modelsPromise
+  let classifierModel = await loadLayersModel({
+    url: './saved_models/c1-model',
+  })
   let embedding = await getImageFeatures({
     tf,
     imageModel: baseModel,
@@ -112,20 +130,26 @@ async function checkFile() {
   let spatialFeatures = embedding.spatialFeatures
   console.log({ spatialFeatures })
 
-  compile()
-  await train({ epoch: 100 })
+  // compile()
+  // await train({ epoch: 100 })
   await predict()
 
   async function predict() {
-    let result2D = classifierModel2D.predict(spatialFeatures) as tf.Tensor
+    let result2D = classifierModel.predict(spatialFeatures) as tf.Tensor
     console.log({ result2D })
     // 1x7x7x2
     let [matrix] = (await result2D.array()) as number[][][][]
+
+    let targets = [] as [x: number, y: number][]
+    const target_threshold = 0.3
 
     /* draw heatmap */
     for (let y = 0; y < matrix.length; y++) {
       for (let x = 0; x < matrix[y].length; x++) {
         let [background, object] = matrix[y][x]
+        if (object >= target_threshold) {
+          targets.push([x, y])
+        }
         let opacity = object * 0.5
         drawBox({
           box: {
@@ -140,11 +164,14 @@ async function checkFile() {
       }
     }
     // TODO calculate it from the heatmap
+    let target_x = targets.map((t) => t[0])
+    let target_y = targets.map((t) => t[1])
+
     let predicted_box: NormalizedBox = {
-      x: 0.55,
-      y: 0.55,
-      width: 0.5,
-      height: 0.5,
+      x: (Math.min(...target_x) + Math.max(...target_x) + 1) / (2 * COL),
+      y: (Math.min(...target_y) + Math.max(...target_y) + 1) / (2 * ROW),
+      width: (Math.max(...target_x) - Math.min(...target_x) + 1) / COL,
+      height: (Math.max(...target_y) - Math.min(...target_y) + 1) / ROW,
     }
 
     /* draw bounding box */
@@ -161,50 +188,50 @@ async function checkFile() {
   }
 
   /* setup for training */
-  function compile() {
-    classifierModel2D.compile({
-      optimizer: 'adam',
-      loss: tf.metrics.categoricalCrossentropy,
-      metrics: [tf.metrics.categoricalAccuracy],
-    })
-  }
+  // function compile() {
+  //   classifierModel2D.compile({
+  //     optimizer: 'adam',
+  //     loss: tf.metrics.categoricalCrossentropy,
+  //     metrics: [tf.metrics.categoricalAccuracy],
+  //   })
+  // }
   /* train the model */
-  async function train(options: { epoch: number }) {
-    console.log('before train')
+  // async function train(options: { epoch: number }) {
+  //   console.log('before train')
 
-    let background_count = 0
-    let object_count = 0
+  //   let background_count = 0
+  //   let object_count = 0
 
-    let ys = []
-    for (let y = 0; y < ROW; y++) {
-      let xs = []
-      for (let x = 0; x < COL; x++) {
-        let grid: PixelBox = {
-          left: x * boxWidth,
-          top: y * boxHeight,
-          right: (x + 1) * boxWidth,
-          bottom: (y + 1) * boxHeight,
-        }
-        let score = calcGridScore(grid, expected_box_pixel)
-        let object = score
-        let background = 1 - object
-        xs.push([background, object])
-        background_count += background
-        object_count += object
-      }
-      ys.push(xs)
-    }
-    console.log({ background_count, object_count })
-    let total_count = background_count + object_count
-    await classifierModel2D.fit(spatialFeatures, tf.tensor([ys]), {
-      epochs: options.epoch,
-      // classWeight: [
-      //   (1 - background_count / total_count) * 2,
-      //   (1 - object_count / total_count) * 2,
-      // ],
-    })
-    console.log('after train')
-  }
+  //   let ys = []
+  //   for (let y = 0 y < ROW y++) {
+  //     let xs = []
+  //     for (let x = 0 x < COL x++) {
+  //       let grid: PixelBox = {
+  //         left: x * boxWidth,
+  //         top: y * boxHeight,
+  //         right: (x + 1) * boxWidth,
+  //         bottom: (y + 1) * boxHeight,
+  //       }
+  //       let score = calcGridScore(grid, expected_box_pixel)
+  //       let object = score
+  //       let background = 1 - object
+  //       xs.push([background, object])
+  //       background_count += background
+  //       object_count += object
+  //     }
+  //     ys.push(xs)
+  //   }
+  //   console.log({ background_count, object_count })
+  //   let total_count = background_count + object_count
+  //   await classifierModel2D.fit(spatialFeatures, tf.tensor([ys]), {
+  //     epochs: options.epoch,
+  //     // classWeight: [
+  //     //   (1 - background_count / total_count) * 2,
+  //     //   (1 - object_count / total_count) * 2,
+  //     // ],
+  //   })
+  //   console.log('after train')
+  // }
 }
 
 type NormalizedBox = {
