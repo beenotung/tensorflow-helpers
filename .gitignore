@@ -14,5 +14,7 @@ saved_model/
 saved_models/
 image.jpg
 bundle.js
+cam.bundle.js
 data.json
 *-data.json
+res/

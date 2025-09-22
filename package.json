@@ -34,7 +34,9 @@
   ],
   "scripts": {
     "dev": "npm run bundle -- --watch",
+    "dev:cam": "npm run bundle:cam -- --watch",
     "bundle": "esbuild browser.test.ts --bundle --outfile=bundle.js",
+    "bundle:cam": "esbuild cam.test.ts --bundle --outfile=cam.bundle.js",
     "test": "tsc --noEmit",
     "clean": "rimraf dist",
     "build": "rimraf dist && tsc -p . && rimraf dist/*.{tsbuildinfo,test.d.ts,test.js} && mk-package",

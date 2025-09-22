@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CAM Test</title>
+    <style>
+      .video-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+      }
+      .item-title {
+        text-align: center;
+      }
+      video,
+      canvas,
+      img {
+        width: 224px;
+        height: 224px;
+      }
+      .class-list {
+        margin: 1rem 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+      }
+      .class-item {
+        padding: 0.25rem;
+      }
+      .class-item.active {
+        background-color: #000;
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <button id="startCameraButton">start camera</button>
+      <button id="startVideoButton">start video</button>
+    </div>
+    <div class="class-list">
+      <button class="class-item">both</button>
+      <button class="class-item active">cat</button>
+      <button class="class-item">dog</button>
+      <button class="class-item">others</button>
+    </div>
+    <div class="video-container">
+      <div class="video-item">
+        <div class="item-title">Cat Image</div>
+        <img id="catImage" src="dataset/cat.jpg" />
+      </div>
+      <div class="video-item">
+        <div class="item-title">Dog Image</div>
+        <img id="dogImage" src="dataset/dog.jpg" />
+      </div>
+      <div class="video-item">
+        <div class="item-title">Video</div>
+        <video id="video" autoplay playsinline></video>
+      </div>
+      <div class="video-item">
+        <div class="item-title">Input</div>
+        <canvas id="inputCanvas"></canvas>
+      </div>
+      <div class="video-item">
+        <div class="item-title">CAM</div>
+        <canvas id="camCanvas"></canvas>
+      </div>
+    </div>
+    <script src="cam.bundle.js"></script>
+  </body>
+</html>
