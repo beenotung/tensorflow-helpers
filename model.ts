@@ -8,7 +8,6 @@ import {
   loadImageFile,
 } from './image'
 import { isContentHash } from './file'
-import { toOneTensor } from './tensor'
 import { ImageModelSpec } from './image-model'
 import {
   attachClassNames,
@@ -278,8 +277,8 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
         height,
         aspectRatio,
       })
-      let outputs = model.predict(imageTensor)
-      let embedding = toOneTensor(outputs)
+      let y = model.predict(imageTensor) as tf.Tensor
+      let embedding = tf.squeeze(y, [0])
       return embedding
     })
   }
