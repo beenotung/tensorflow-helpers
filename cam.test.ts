@@ -256,7 +256,7 @@ async function startVideo() {
     video.onloadedmetadata = () => resolve()
     let file =
       'A dog, a cat, and a hamster who gets the last treat [3F5Cz_YN8FA].mp4'
-    video.src = 'dataset/' + file
+    video.src = 'samples/' + file
     video.play()
   })
   loopVideo()
