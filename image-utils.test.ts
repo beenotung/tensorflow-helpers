@@ -2,16 +2,16 @@ import { cropAndResizeImageFile } from './image'
 
 async function main() {
   await cropAndResizeImageFile({
-    srcFile: 'dataset/wide.jpg',
-    destFile: 'dataset/wide-square.jpg',
+    srcFile: 'samples/wide.jpg',
+    destFile: 'samples/wide-square.jpg',
     width: 224,
     height: 224,
     aspectRatio: 'center-crop',
   })
 
   await cropAndResizeImageFile({
-    srcFile: 'dataset/tall.jpg',
-    destFile: 'dataset/tall-square.jpg',
+    srcFile: 'samples/tall.jpg',
+    destFile: 'samples/tall-square.jpg',
     width: 224,
     height: 224,
     aspectRatio: 'center-crop',
