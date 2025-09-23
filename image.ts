@@ -88,7 +88,6 @@ export async function cropAndResizeImageFile(options: {
   })
   let tensor3D = tf.tidy(() => toTensor3D(imageTensor).mul<tf.Tensor3D>(255))
   let content = await tf.node.encodeJpeg(tensor3D)
-  tf.image.cropAndResize
   tensor3D.dispose()
   await writeFile(options.destFile, content)
 }
