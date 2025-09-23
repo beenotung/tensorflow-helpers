@@ -1,6 +1,6 @@
 import { ImageModel, loadLayersModel, saveModel } from './model'
 import * as tf from '@tensorflow/tfjs'
-import { existsSync } from 'fs'
+import { existsSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
 import { disposeTensor, toOneTensor } from './tensor'
 import { ClassWeight, ClassWeightMap } from '@tensorflow/tfjs'
@@ -10,6 +10,7 @@ import {
   ClassificationResult,
   calcClassWeight,
   createImageClassifier,
+  getClassCount,
   mapWithClassName,
 } from './classifier-utils'
 export * from './classifier-utils'
@@ -28,10 +29,6 @@ export async function loadImageClassifierModel(options: {
 }) {
   let { baseModel, datasetDir, modelDir, classNames } = options
 
-  if (!classNames && existsSync(datasetDir)) {
-    classNames = getDirFilenamesSync(datasetDir)
-  }
-
   let classifierModel = existsSync(modelDir)
     ? await loadLayersModel({ dir: modelDir, classNames })
     : createImageClassifier({
@@ -39,19 +36,27 @@ export async function loadImageClassifierModel(options: {
         hiddenLayers: options.hiddenLayers,
         get classes() {
           if (!classNames) {
-            throw new Error('classNames not provided')
+            return getClassesFromDatasetDir(datasetDir).length
           }
           return classNames.length
         },
         classNames,
       })
-  classNames = classifierModel.classNames
+  classNames = classifierModel.classNames || classNames
+  if (!classNames && existsSync(datasetDir)) {
+    classNames = getClassesFromDatasetDir(datasetDir)
+  }
   if (!classNames) {
     throw new Error('classNames not provided')
   }
-  let classCount = classNames.length
-  if (classCount < 2) {
+  if (classNames.length < 2) {
     throw new Error('expect at least 2 classes')
+  }
+  let classCount = getClassCount(classifierModel.outputShape)
+  if (classNames.length !== classCount) {
+    throw new Error(
+      `classNames length mismatch: given ${classNames.length} classes, but the model has ${classCount} outputs`,
+    )
   }
 
   let compiled = false
@@ -211,4 +216,18 @@ export async function loadImageClassifierModel(options: {
     train,
     save,
   }
+}
+
+export function getClassesFromDatasetDir(datasetDir: string) {
+  if (!existsSync(datasetDir)) {
+    throw new Error('datasetDir not exists')
+  }
+  let classNames = getDirFilenamesSync(datasetDir).filter(filename => {
+    let file = join(datasetDir, filename)
+    return statSync(file).isDirectory()
+  })
+  if (classNames.length === 0) {
+    throw new Error('no image folders found in datasetDir')
+  }
+  return classNames
 }
