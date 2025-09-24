@@ -138,7 +138,9 @@ export async function loadImageClassifierModel(options: {
     for (let { classIdx, dir, filenames } of classes) {
       for (let filename of filenames) {
         let file = join(dir, filename)
-        let embedding = await baseModel.imageFileToEmbedding(file)
+        let embedding = await baseModel.imageFileToEmbedding(file, {
+          squeeze: true,
+        })
         xs.push(embedding)
         classIndices.push(classIdx)
         classCounts[classIdx]++
