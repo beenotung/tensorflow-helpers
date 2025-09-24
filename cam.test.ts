@@ -15,9 +15,7 @@ let video = document.getElementById('video') as HTMLVideoElement
 let inputCanvas = document.getElementById('inputCanvas') as HTMLCanvasElement
 let camCanvas = document.getElementById('camCanvas') as HTMLCanvasElement
 
-let classItems = Array.from(
-  document.querySelectorAll<HTMLElement>('.class-item'),
-)
+let classList = document.querySelector('.class-list') as HTMLDivElement
 
 let inputContext = inputCanvas.getContext('2d')!
 let camContext = camCanvas.getContext('2d')!
@@ -27,15 +25,6 @@ inputCanvas.width = size
 inputCanvas.height = size
 camCanvas.width = size
 camCanvas.height = size
-
-classItems.forEach(item => {
-  item.onclick = async () => {
-    classItems.forEach(item => {
-      item.classList.remove('active')
-    })
-    item.classList.add('active')
-  }
-})
 
 let brightnessRate = 1
 
@@ -165,39 +154,53 @@ async function loopVideo() {
   }
   inputContext.putImageData(imageData, 0, 0)
 
-  console.log({ max, min })
-  debugger
-
   await analyze(imageData)
 
   requestAnimationFrame(loopVideo)
 }
 
 async function analyze(imageData: ImageData) {
+  let selectedClassIndex = -1
+  Array.from(classList.children).forEach((button, index) => {
+    if (button.classList.contains('active')) {
+      selectedClassIndex = index
+    }
+  })
+
   let models = await modelsP
-  let tape = tf.grad(x => {
+
+  let gradFunc = tf.valueAndGrad(x => {
+    // x: [1, 224, 224, 3]
+    // embedding: [1, 1280]
     let embedding = models.baseModel.model.predict(x) as tf.Tensor
-    // return embedding.slice(0, 1)
-    // return embedding
-    let y = models.classifier.classifierModel.predict(embedding) as tf.Tensor
-    let mask = tf.tensor(
-      classItems.map(item => (item.classList.contains('active') ? 1 : 0)),
-    )
-    return tf.mul(y, mask)
+    // logits: [1, 4]
+    let logits = models.classifier.classifierModel.predict(
+      embedding,
+    ) as tf.Tensor
+    // tf.argMax: [1]
+    let classIndex: number = selectedClassIndex
+    if (classIndex == -1) {
+      classIndex = (tf.argMax(logits, -1).arraySync() as number[])[0]
+      classList.children[classIndex].classList.add('active')
+    }
+    let classScore = tf.slice(logits, [0, classIndex], [1, 1])
+    return classScore
   })
 
   let data = tf.tidy(() => {
     let x = tf.browser.fromPixels(inputCanvas)
+    x = tf.cast(x, 'float32')
     x = tf.div(x, 255)
     x = tf.expandDims(x, 0)
-    let grad = tape(x)
+    let { grad, value } = gradFunc(x)
     let min = tf.min(grad)
     let max = tf.max(grad)
     let range = tf.sub(max, min)
     let normalized = tf.div(tf.sub(grad, min), range)
-    // [224, 224, 3]
-    let data = normalized.squeeze().arraySync() as number[][][]
-    return data
+    // [224, 224, 3] -> [224, 224] by taking average of RGB channels
+    let grayscale = tf.mean(normalized, 3) // mean across channel dimension
+    let data = grayscale.arraySync() as number[][][]
+    return data[0]
   })
 
   let i = 0
@@ -205,17 +208,17 @@ async function analyze(imageData: ImageData) {
   let max = 0
   for (let y = 0; y < imageData.height; y++) {
     for (let x = 0; x < imageData.width; x++, i += 4) {
-      let r = Math.floor(data[y][x][0] * 255)
-      let g = Math.floor(data[y][x][1] * 255)
-      let b = Math.floor(data[y][x][2] * 255)
-      min = Math.min(min, r, g, b)
-      max = Math.max(max, r, g, b)
-      imageData.data[i] = r
-      imageData.data[i + 1] = g
-      imageData.data[i + 2] = b
+      let grayscale = Math.floor(data[y][x] * 255)
+      min = Math.min(min, grayscale)
+      max = Math.max(max, grayscale)
+      // Use the same grayscale value for all RGB channels
+      imageData.data[i] = grayscale
+      imageData.data[i + 1] = grayscale
+      imageData.data[i + 2] = grayscale
       imageData.data[i + 3] = 255
     }
   }
+  console.log({ min, max })
   if (min != max) {
     camContext.putImageData(imageData, 0, 0)
   }
@@ -223,20 +226,43 @@ async function analyze(imageData: ImageData) {
 
 async function loadModels() {
   let baseModel = await loadImageModel({
-    url: 'res/cat-dog/base_model',
-    cacheUrl: 'indexeddb://cat-dog-base-model',
+    url: 'saved_model/base_model',
+    cacheUrl: 'indexeddb://base-model',
     checkForUpdates: false,
   })
   let classifier = await loadImageClassifierModel({
     baseModel,
-    classNames: ['both', 'cat', 'dog', 'others'],
-    modelUrl: 'res/cat-dog/classifier_model',
-    cacheUrl: 'indexeddb://cat-dog-classifier-model',
+    modelUrl: 'saved_model/classifier_model',
+    cacheUrl: 'indexeddb://classifier-model',
+    checkForUpdates: true,
   })
+
+  classList.textContent = ''
+  for (let className of classifier.classNames) {
+    let button = document.createElement('button')
+    button.classList.add('class-item')
+    button.textContent = className
+    button.onclick = () => {
+      if (button.classList.contains('active')) {
+        button.classList.remove('active')
+        return
+      }
+      for (let button of classList.children) {
+        button.classList.remove('active')
+      }
+      button.classList.add('active')
+    }
+    classList.appendChild(button)
+  }
+
   return { baseModel, classifier }
 }
 
 let modelsP = loadModels()
+modelsP.catch(e => {
+  console.error(e)
+  alert('Failed to load models: ' + String(e))
+})
 
 async function startCamera() {
   let stream = await navigator.mediaDevices.getUserMedia({
