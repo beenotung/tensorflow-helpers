@@ -34,7 +34,9 @@
   ],
   "scripts": {
     "dev": "npm run bundle -- --watch",
+    "dev:chart": "npm run bundle:chart -- --watch",
     "bundle": "esbuild browser.test.ts --bundle --outfile=bundle.js",
+    "bundle:chart": "esbuild chart.ts --bundle --outfile=chart.bundle.js",
     "test": "tsc --noEmit",
     "clean": "rimraf dist",
     "build": "rimraf dist && tsc -p . && rimraf dist/*.{tsbuildinfo,test.d.ts,test.js} && mk-package",
