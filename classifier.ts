@@ -105,6 +105,7 @@ export async function loadImageClassifierModel(options: {
 
     let total = 0
     let classes = []
+    let timer = startTimer('scan dataset')
     timer.setEstimateProgress(classNames!.length)
     for (let i = 0; i < classNames!.length; i++) {
       let className = classNames![i]
@@ -116,9 +117,10 @@ export async function loadImageClassifierModel(options: {
         dir,
         filenames,
       })
+      timer.tick()
     }
 
-    let timer = startTimer('load dataset')
+    timer.next('load dataset')
     timer.setEstimateProgress(total)
     for (let { classIdx, dir, filenames } of classes) {
       for (let filename of filenames) {
@@ -130,19 +132,24 @@ export async function loadImageClassifierModel(options: {
         timer.tick()
       }
     }
-    timer.end()
 
+    timer.next('stack embeddings')
     let x = tf.concat(xs)
 
     if (!baseModel.fileEmbeddingCache) {
+      timer.next('dispose individual embeddings')
+      timer.setEstimateProgress(xs.length)
       for (let x of xs) {
         x.dispose()
+        timer.tick()
       }
     }
 
+    timer.next('prepare one-hot labels')
     let y = tf.tidy(() =>
       tf.oneHot(tf.tensor1d(classIndices, 'int32'), classCount),
     )
+    timer.end()
 
     return { x, y, classCounts }
   }
