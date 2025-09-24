@@ -55,6 +55,17 @@ async function getLastModified(url: string) {
   return text ? new Date(text).getTime() : Date.now()
 }
 
+async function getModelClassNames(url: string): Promise<string[] | undefined> {
+  url = removeModelUrlPrefix(url)
+  url += '/model.json'
+  let res = await fetch(url, { method: 'HEAD' })
+  if (res.status == 404) {
+    throw new Error('file not found: ' + url)
+  }
+  let json = await res.json()
+  return json.classNames || undefined
+}
+
 /**
  * @example `loadGraphModel({ url: 'saved_model/mobilenet-v3-large-100' })`
  */
@@ -101,13 +112,14 @@ async function cachedLoadModel<
   let { options, loadRemoteModel, loadLocalModel } = args
   let { url: modelUrl, cacheUrl, classNames } = options
 
-  let localLastModified = +localStorage.getItem(cacheUrl)!
+  let localCacheInfo: LocalCacheInfo = loadLocalCacheInfo(cacheUrl)
+
   let checkTime = Date.now()
   let remoteLastModified = options.checkForUpdates
     ? await getLastModified(modelUrl).catch(error => {
-        if (localLastModified) {
+        if (localCacheInfo.lastModified) {
           // skip checking if offline and already cached
-          return localLastModified
+          return localCacheInfo.lastModified
         }
         // throw error if offline without pre-cached copy
         throw error
@@ -115,11 +127,13 @@ async function cachedLoadModel<
     : 0
 
   if (
-    localLastModified &&
-    (!options.checkForUpdates || localLastModified == remoteLastModified)
+    localCacheInfo.lastModified &&
+    (!options.checkForUpdates ||
+      localCacheInfo.lastModified == remoteLastModified)
   ) {
     try {
       let model = await loadLocalModel()
+      model.classNames ||= localCacheInfo.classNames
       classNames = checkClassNames(model, classNames)
       return attachClassNames(model, classNames)
     } catch (error) {
@@ -130,13 +144,42 @@ async function cachedLoadModel<
   }
 
   let _model = await loadRemoteModel()
+  _model.classNames ||= await getModelClassNames(modelUrl)
   classNames = checkClassNames(_model, classNames)
   let model = attachClassNames(_model, classNames)
 
   await model.save(cacheUrl)
-  localStorage.setItem(cacheUrl, (remoteLastModified || checkTime).toString())
+  localCacheInfo = {
+    lastModified: remoteLastModified || checkTime,
+    classNames,
+  }
+  localStorage.setItem(cacheUrl, JSON.stringify(localCacheInfo))
 
   return model
+}
+
+type LocalCacheInfo = {
+  lastModified: number
+  classNames?: string[]
+}
+
+function loadLocalCacheInfo(cacheUrl: string): LocalCacheInfo {
+  let text = localStorage.getItem(cacheUrl)
+  let fallback: LocalCacheInfo = { lastModified: 0 }
+  try {
+    let json = JSON.parse(text || '{}') as LocalCacheInfo
+    if (+json) {
+      // old version, only having timestamp
+      return fallback
+    }
+    if (json.lastModified) {
+      // new version, having timestamp and classNames
+      return json
+    }
+    return fallback
+  } catch (error) {
+    return fallback
+  }
 }
 
 /**
