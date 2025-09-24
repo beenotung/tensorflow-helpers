@@ -31,7 +31,8 @@ async function main() {
   let classes = await classifier.classifyImageFile('image.jpg')
   let topClass = topClassifyResult(classes)
 
-  console.log('result:', topClass)
+  console.log('classes:', classes)
+  console.log('top result:', topClass)
   // [print] result: { label: 'anime', confidence: 0.7991582155227661 }
 }
 main().catch(e => console.error(e))
