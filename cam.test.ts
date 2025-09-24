@@ -1,6 +1,7 @@
 import * as tf from '@tensorflow/tfjs'
 import { loadImageClassifierModel, loadImageModel } from './browser'
 import { generate_heatmap_values, heatmap_schemes } from 'heatmap-values'
+import { selectImage } from '@beenotung/tslib/file'
 
 console.log('cam.test.ts')
 
@@ -11,6 +12,9 @@ let heatmap_values = generate_heatmap_values(
 let poolingRadius = document.getElementById('poolingRadius') as HTMLInputElement
 let catImage = document.getElementById('catImage') as HTMLImageElement
 let dogImage = document.getElementById('dogImage') as HTMLImageElement
+let pickImageButton = document.getElementById(
+  'pickImageButton',
+) as HTMLButtonElement
 let startCameraButton = document.getElementById(
   'startCameraButton',
 ) as HTMLButtonElement
@@ -59,6 +63,17 @@ catImage.onclick = async () => {
 }
 dogImage.onclick = async () => {
   clickedImage = dogImage
+  await analyzeImage(clickedImage)
+}
+pickImageButton.onclick = async () => {
+  let [file] = await selectImage({ accept: 'image/*' })
+  if (!file) return
+  let image = new Image()
+  await new Promise<void>(resolve => {
+    image.onload = () => resolve()
+    image.src = URL.createObjectURL(file)
+  })
+  clickedImage = image
   await analyzeImage(clickedImage)
 }
 poolingRadius.onchange = async () => {
@@ -345,6 +360,9 @@ async function loadModels() {
         button.classList.remove('active')
       }
       button.classList.add('active')
+      if (clickedImage) {
+        analyzeImage(clickedImage)
+      }
     }
     classList.appendChild(button)
   }
