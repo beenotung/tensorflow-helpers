@@ -26,14 +26,6 @@ async function main() {
   })
   // console.log('history:', history)
 
-  // reuse the encoded image dataset
-  await classifier.train({
-    x,
-    y,
-    epochs: 5,
-    batchSize: 32,
-  })
-
   await classifier.save()
 
   let classes = await classifier.classifyImageFile('image.jpg')
