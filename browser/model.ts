@@ -7,13 +7,13 @@ import {
   cropAndResizeImageTensor,
 } from '../image-utils'
 import { ImageModelSpec, SpatialFeatures } from '../image-model'
-import { toOneTensor } from '../tensor'
 import {
   attachClassNames,
   checkClassNames,
   getClassCount,
   ModelArtifactsWithClassNames,
 } from '../classifier-utils'
+import { ImageEmbeddingOptions } from '../model-utils'
 
 async function readFile(url: string) {
   let res = await fetch(url)
@@ -447,13 +447,16 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     }
   }
 
-  async function imageUrlToEmbedding(url: string): Promise<tf.Tensor> {
+  async function imageUrlToEmbedding(
+    url: string,
+    options?: ImageEmbeddingOptions,
+  ): Promise<tf.Tensor> {
     let embedding = checkCache(url)
     if (embedding) return embedding
 
     let imageTensor = await loadImageCropped(url)
 
-    embedding = imageTensorToEmbedding(imageTensor)
+    embedding = imageTensorToEmbedding(imageTensor, options)
     imageTensor.dispose()
 
     if (cache && isContentHash(url)) {
@@ -463,7 +466,10 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     return embedding
   }
 
-  async function imageFileToEmbedding(file: File): Promise<tf.Tensor> {
+  async function imageFileToEmbedding(
+    file: File,
+    options?: ImageEmbeddingOptions,
+  ): Promise<tf.Tensor> {
     let filename = file.name
     let embedding = checkCache(filename)
     if (embedding) return embedding
@@ -477,7 +483,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
 
     let imageTensor = await loadImageCropped(url)
 
-    embedding = imageTensorToEmbedding(imageTensor)
+    embedding = imageTensorToEmbedding(imageTensor, options)
     imageTensor.dispose()
 
     if (cache && isContentHash(filename)) {
@@ -487,7 +493,10 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     return embedding
   }
 
-  function imageTensorToEmbedding(imageTensor: ImageTensor): tf.Tensor {
+  function imageTensorToEmbedding(
+    imageTensor: ImageTensor,
+    options?: ImageEmbeddingOptions,
+  ): tf.Tensor {
     return tf.tidy(() => {
       let inputTensor = cropAndResizeImageTensor({
         imageTensor,
@@ -495,8 +504,10 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
         height,
         aspectRatio,
       })
-      let outputs = model.predict(inputTensor)
-      let embedding = toOneTensor(outputs)
+      let embedding = model.predict(inputTensor) as tf.Tensor
+      if (options?.squeeze) {
+        embedding = tf.squeeze(embedding, [0])
+      }
       return embedding
     })
   }

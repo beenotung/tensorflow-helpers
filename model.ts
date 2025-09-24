@@ -20,6 +20,7 @@ import {
   filterSpatialNodesWithUniqueShapes,
   getSpatialNodes,
 } from './spatial-utils'
+import { ImageEmbeddingOptions } from './model-utils'
 export { ImageModelSpec, PreTrainedImageModels } from './image-model'
 
 export type Model = tf.GraphModel | tf.LayersModel
@@ -235,7 +236,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
 
   async function imageFileToEmbedding(
     file: string,
-    options?: { expandAnimations?: boolean },
+    options?: ImageEmbeddingOptions,
   ): Promise<tf.Tensor> {
     let embedding = checkCache(file)
     if (embedding) return embedding
@@ -256,7 +257,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
           cause: error,
         })
       }
-      let embedding = imageTensorToEmbedding(imageTensor)
+      let embedding = imageTensorToEmbedding(imageTensor, options)
       if (cache && isContentHash(file)) {
         saveCache(file, embedding)
       }
@@ -266,6 +267,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
 
   function imageTensorToEmbedding(
     imageTensor: tf.Tensor3D | tf.Tensor4D,
+    options?: ImageEmbeddingOptions,
   ): tf.Tensor {
     return tf.tidy(() => {
       imageTensor = cropAndResizeImageTensor({
@@ -274,8 +276,10 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
         height,
         aspectRatio,
       })
-      let y = model.predict(imageTensor) as tf.Tensor
-      let embedding = tf.squeeze(y, [0])
+      let embedding = model.predict(imageTensor) as tf.Tensor
+      if (options?.squeeze) {
+        embedding = tf.squeeze(embedding, [0])
+      }
       return embedding
     })
   }
