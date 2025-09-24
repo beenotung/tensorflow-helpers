@@ -136,7 +136,7 @@ export async function loadImageClassifierModel(options: {
     }
 
     timer.next('stack embeddings')
-    let x = tf.concat(xs)
+    let x = tf.stack(xs)
 
     if (!baseModel.fileEmbeddingCache) {
       timer.next('dispose individual embeddings')
