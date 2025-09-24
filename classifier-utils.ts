@@ -31,7 +31,7 @@ export function createImageClassifier(spec: ClassifierModelSpec) {
     }
   }
   classifierModel.add(
-    tf.layers.dense({ units: spec.classes, activation: 'softmax' }),
+    tf.layers.dense({ units: spec.classes, activation: 'linear' }),
   )
 
   return attachClassNames(classifierModel, classNames)

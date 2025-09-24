@@ -64,7 +64,7 @@ export async function loadImageClassifierModel(options: {
     compiled = true
     classifierModel.compile({
       optimizer: 'adam',
-      loss: tf.metrics.categoricalCrossentropy,
+      loss: tf.losses.softmaxCrossEntropy,
       metrics: [tf.metrics.categoricalAccuracy],
     })
   }
@@ -92,7 +92,8 @@ export async function loadImageClassifierModel(options: {
         embedding = tf.expandDims(embedding, 0)
       }
       let y = classifierModel.predict(embedding) as tf.Tensor
-      let probs = tf.squeeze(y, [0])
+      y = tf.squeeze(y, [0])
+      let probs = tf.softmax(y)
       return probs
     })
     let values = await outputs.data()
