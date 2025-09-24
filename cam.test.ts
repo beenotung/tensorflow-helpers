@@ -213,9 +213,14 @@ async function analyze(imageData: ImageData) {
     return data[0]
   })
 
+  let maxClassNameLength = Math.max(
+    ...models.classifier.classNames.map(className => className.length),
+  )
+
   outputProbs.textContent = models.classifier.classNames
     .map((className, index) => {
-      return `${className}:   \t ${(output.probs[index] * 100).toFixed(1)}% (${output.logits[index].toFixed(3)})`
+      className = className.padStart(maxClassNameLength, ' ')
+      return `${className}: ${(output.probs[index] * 100).toFixed(1)}% (${output.logits[index].toFixed(3)})`
     })
     .join('\n')
 
