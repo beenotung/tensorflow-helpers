@@ -4,8 +4,50 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chart</title>
+    <style>
+      .chart-name {
+        font-weight: bold;
+      }
+      .chart-nodes {
+        position: relative;
+        margin: 0.5rem;
+      }
+      .node {
+        position: absolute;
+        outline: 1px solid black;
+        border-radius: 0.5rem;
+        width: fit-content;
+        padding: 0.5rem;
+      }
+      .node-name {
+        font-weight: bold;
+        max-width: 30ch;
+      }
+      .node-op {
+        background-color: lightblue;
+        padding: 0.25rem;
+        border-radius: 0.25rem;
+        width: fit-content;
+      }
+      .node-canvas {
+        position: absolute;
+        inset: 0;
+      }
+    </style>
   </head>
   <body>
+    <div id="chart">
+      <div class="chart-name">MobileNetV3</div>
+      <div class="chart-nodes">
+        <div class="node">
+          <div class="node-name">Output</div>
+          <div class="node-op">Identity</div>
+          <div>depth: <span class="node-depth">0</span></div>
+          <div>shape: <span class="node-shape">224x224x3</span></div>
+        </div>
+        <canvas class="node-canvas"></canvas>
+      </div>
+    </div>
     <script src="chart.bundle.js"></script>
   </body>
 </html>
