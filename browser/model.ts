@@ -59,7 +59,7 @@ async function getLastModified(url: string) {
 async function getModelClassNames(url: string): Promise<string[] | undefined> {
   url = removeModelUrlPrefix(url)
   url += '/model.json'
-  let res = await fetch(url, { method: 'HEAD' })
+  let res = await fetch(url)
   if (res.status == 404) {
     throw new Error('file not found: ' + url)
   }
