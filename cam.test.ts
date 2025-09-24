@@ -196,8 +196,15 @@ async function loopVideo() {
   requestAnimationFrame(loopVideo)
 }
 
-function spreadNormalizedGradientsPeaks(data: number[][]): number[][] {
-  let radius = poolingRadius.valueAsNumber
+function spreadNormalizedGradientsPeaks(
+  data: number[][],
+  options: {
+    radius: number
+    spread_positive?: boolean
+    spread_negative?: boolean
+  },
+): number[][] {
+  let { radius, spread_positive, spread_negative } = options
   if (radius <= 0) {
     return data
   }
@@ -219,7 +226,18 @@ function spreadNormalizedGradientsPeaks(data: number[][]): number[][] {
             continue
           }
           let value = data[ty][tx]
-          let dist = Math.abs(value - 0.5)
+          let dist: number
+          if (spread_positive && spread_negative) {
+            dist = Math.abs(value - 0.5)
+          } else if (spread_positive) {
+            dist = value - 0.5
+          } else if (spread_negative) {
+            dist = 0.5 - value
+          } else {
+            throw new Error(
+              'either spread_positive or spread_negative must be true',
+            )
+          }
           if (dist > newDist) {
             newValue = value
             newDist = dist
@@ -291,7 +309,11 @@ async function analyze(imageData: ImageData) {
     return data[0]
   })
 
-  data = spreadNormalizedGradientsPeaks(data)
+  data = spreadNormalizedGradientsPeaks(data, {
+    radius: poolingRadius.valueAsNumber,
+    spread_positive: true,
+    spread_negative: true,
+  })
 
   let maxClassNameLength = Math.max(
     ...models.classifier.classNames.map(className => className.length),
