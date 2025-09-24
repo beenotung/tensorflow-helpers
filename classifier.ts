@@ -104,14 +104,19 @@ export async function loadImageClassifierModel(options: {
     let classCounts: number[] = new Array(classCount).fill(0)
 
     let total = 0
-    let classes = await Promise.all(
-      classNames!.map(async (className, classIdx) => {
-        let dir = join(datasetDir, className)
-        let filenames = await getDirFilenames(dir)
-        total += filenames.length
-        return { classIdx, dir, filenames }
-      }),
-    )
+    let classes = []
+    timer.setEstimateProgress(classNames!.length)
+    for (let i = 0; i < classNames!.length; i++) {
+      let className = classNames![i]
+      let dir = join(datasetDir, className)
+      let filenames = await getDirFilenames(dir)
+      total += filenames.length
+      classes.push({
+        classIdx: i,
+        dir,
+        filenames,
+      })
+    }
 
     let timer = startTimer('load dataset')
     timer.setEstimateProgress(total)
