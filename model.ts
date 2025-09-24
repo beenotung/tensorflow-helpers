@@ -117,10 +117,7 @@ export async function loadLayersModel(options: {
     let classCount = getClassCount(model.outputShape)
     if (classCount != classNames.length) {
       throw new Error(
-        'number of classes mismatch, expected: ' +
-          classNames.length +
-          ', got: ' +
-          classCount,
+        `number of classes mismatch, expected: ${classNames.length}, got: ${classCount}`,
       )
     }
   }

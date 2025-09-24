@@ -59,9 +59,14 @@ export async function loadImageClassifierModel(options: {
   if (!classNames) {
     throw new Error('classNames not provided')
   }
-  let classCount = classNames.length
-  if (classCount < 2) {
+  if (classNames.length < 2) {
     throw new Error('expect at least 2 classes')
+  }
+  let classCount = getClassCount(classifierModel.outputShape)
+  if (classNames.length !== classCount) {
+    throw new Error(
+      `classNames length mismatch: given ${classNames.length} classes, but the model has ${classCount} outputs`,
+    )
   }
 
   let compiled = false

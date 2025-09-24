@@ -11,6 +11,7 @@ import { toOneTensor } from '../tensor'
 import {
   attachClassNames,
   checkClassNames,
+  getClassCount,
   ModelArtifactsWithClassNames,
 } from '../classifier-utils'
 
@@ -211,6 +212,14 @@ export async function loadLayersModel(options: {
       return modelArtifact
     },
   })
+  if (classNames) {
+    let classCount = getClassCount(model.outputShape)
+    if (classCount != classNames.length) {
+      throw new Error(
+        `number of classes mismatch, expected: ${classNames.length}, got: ${classCount}`,
+      )
+    }
+  }
   return attachClassNames(model, classNames)
 }
 
