@@ -206,18 +206,30 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     ? new Map()
     : null
 
-  function checkCache(file_or_filename: string): tf.Tensor | void {
+  function checkCache(
+    file_or_filename: string,
+    options?: ImageEmbeddingOptions,
+  ): tf.Tensor | void {
     if (!fileEmbeddingCache || !isContentHash(file_or_filename)) return
 
     let filename = basename(file_or_filename)
 
     let embedding = fileEmbeddingCache.get(filename)
-    if (embedding) return embedding
+    if (embedding) {
+      let shape = embedding.shape
+      if (options?.squeeze && shape.length > 1 && shape[0] == 1) {
+        let squeezed = tf.squeeze(embedding, [0])
+        embedding.dispose()
+        fileEmbeddingCache.set(filename, squeezed)
+        return squeezed
+      }
+      return embedding
+    }
 
     let values = typeof cache == 'object' ? cache.get(filename) : undefined
     if (!values) return
 
-    embedding = tf.tensor([values])
+    embedding = options?.squeeze ? tf.tensor(values) : tf.tensor([values])
     fileEmbeddingCache.set(filename, embedding)
 
     return embedding
@@ -238,7 +250,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     file: string,
     options?: ImageEmbeddingOptions,
   ): Promise<tf.Tensor> {
-    let embedding = checkCache(file)
+    let embedding = checkCache(file, options)
     if (embedding) return embedding
     let content = await readFile(file)
     return tf.tidy(() => {
