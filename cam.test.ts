@@ -179,7 +179,7 @@ async function analyze(imageData: ImageData) {
     logits: [] as number[],
     probs: [] as number[],
   }
-  let gradFunc = tf.valueAndGrad(x => {
+  let gradFunc = tf.grad(x => {
     // x: [1, 224, 224, 3]
     // embedding: [1, 1280]
     let embedding = models.baseModel.model.predict(x) as tf.Tensor
@@ -207,7 +207,7 @@ async function analyze(imageData: ImageData) {
     x = tf.cast(x, 'float32')
     x = tf.div(x, 255)
     x = tf.expandDims(x, 0)
-    let { grad, value } = gradFunc(x)
+    let grad = gradFunc(x)
     let min = tf.min(grad)
     let max = tf.max(grad)
     let range = tf.sub(max, min)
