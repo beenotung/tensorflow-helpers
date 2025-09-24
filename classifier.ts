@@ -2,7 +2,6 @@ import { ImageModel, loadLayersModel, saveModel } from './model'
 import * as tf from '@tensorflow/tfjs'
 import { existsSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
-import { disposeTensor, toOneTensor } from './tensor'
 import { ClassWeight, ClassWeightMap } from '@tensorflow/tfjs'
 import { startTimer } from '@beenotung/tslib/timer'
 import { getDirFilenames, getDirFilenamesSync } from '@beenotung/tslib/fs'
@@ -97,7 +96,7 @@ export async function loadImageClassifierModel(options: {
       return probs
     })
     let values = await outputs.data()
-    disposeTensor(outputs)
+    outputs.dispose()
     return mapWithClassName(classNames!, values)
   }
 

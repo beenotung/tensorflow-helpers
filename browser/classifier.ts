@@ -7,7 +7,6 @@ import {
   getClassCount,
   mapWithClassName,
 } from '../classifier-utils'
-import { disposeTensor, toOneTensor } from '../tensor'
 
 export type ClassifierModel = Awaited<
   ReturnType<typeof loadImageClassifierModel>
@@ -120,7 +119,7 @@ export async function loadImageClassifierModel(options: {
       return probs
     })
     let values = await outputs.data()
-    disposeTensor(outputs)
+    outputs.dispose()
     return mapWithClassName(classNames!, values)
   }
 
