@@ -40,6 +40,8 @@ export function createImageClassifier(spec: ClassifierModelSpec) {
 export type ClassificationOptions = {
   /** default: true */
   applySoftmax?: boolean
+  /** default: false */
+  squeeze?: boolean
 }
 
 export type ClassificationResult = {

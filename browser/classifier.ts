@@ -123,7 +123,9 @@ export async function loadImageClassifierModel(options: {
         embedding = tf.expandDims(embedding, 0)
       }
       let y = classifierModel.predict(embedding) as tf.Tensor
-      y = tf.squeeze(y, [0])
+      if (options?.squeeze) {
+        y = tf.squeeze(y, [0])
+      }
       if (options?.applySoftmax !== false) {
         y = tf.softmax(y)
       }
