@@ -8,6 +8,7 @@ let heatmap_values = generate_heatmap_values(
   heatmap_schemes.red_transparent_blue,
 )
 
+let poolingRadius = document.getElementById('poolingRadius') as HTMLInputElement
 let catImage = document.getElementById('catImage') as HTMLImageElement
 let dogImage = document.getElementById('dogImage') as HTMLImageElement
 let startCameraButton = document.getElementById(
@@ -19,18 +20,24 @@ let startVideoButton = document.getElementById(
 let video = document.getElementById('video') as HTMLVideoElement
 let inputCanvas = document.getElementById('inputCanvas') as HTMLCanvasElement
 let camCanvas = document.getElementById('camCanvas') as HTMLCanvasElement
+let extractedCanvas = document.getElementById(
+  'extractedCanvas',
+) as HTMLCanvasElement
 
 let classList = document.querySelector('.class-list') as HTMLDivElement
 let outputProbs = document.getElementById('outputProbs') as HTMLDivElement
 
 let inputContext = inputCanvas.getContext('2d')!
 let camContext = camCanvas.getContext('2d')!
+let extractedContext = extractedCanvas.getContext('2d')!
 
 let size = 224
 inputCanvas.width = size
 inputCanvas.height = size
 camCanvas.width = size
 camCanvas.height = size
+extractedCanvas.width = size
+extractedCanvas.height = size
 
 let brightnessRate = 1
 
@@ -45,11 +52,20 @@ startVideoButton.onclick = async () => {
   await startVideo()
 }
 
+let clickedImage = null as HTMLImageElement | null
 catImage.onclick = async () => {
-  await analyzeImage(catImage)
+  clickedImage = catImage
+  await analyzeImage(clickedImage)
 }
 dogImage.onclick = async () => {
-  await analyzeImage(dogImage)
+  clickedImage = dogImage
+  await analyzeImage(clickedImage)
+}
+poolingRadius.onchange = async () => {
+  if (!clickedImage) {
+    return
+  }
+  await analyzeImage(clickedImage)
 }
 
 async function analyzeImage(image: HTMLImageElement) {
@@ -165,6 +181,42 @@ async function loopVideo() {
   requestAnimationFrame(loopVideo)
 }
 
+function spreadNormalizedGradientsPeaks(data: number[][]): number[][] {
+  let radius = poolingRadius.valueAsNumber
+  if (radius <= 0) {
+    return data
+  }
+  let newData = data.map(row => new Array(row.length))
+  for (let y = 0; y < data.length; y++) {
+    let min_y = Math.max(y - radius, 0)
+    let max_y = Math.min(y + radius, data.length - 1)
+    for (let x = 0; x < data[y].length; x++) {
+      let min_x = Math.max(x - radius, 0)
+      let max_x = Math.min(x + radius, data[y].length - 1)
+      let newValue = 0.5
+      let newDist = 0
+      for (let ty = min_y; ty <= max_y; ty++) {
+        let dy = ty - y
+        for (let tx = min_x; tx <= max_x; tx++) {
+          let dx = tx - x
+          let r = Math.sqrt(dx * dx + dy * dy)
+          if (r > radius) {
+            continue
+          }
+          let value = data[ty][tx]
+          let dist = Math.abs(value - 0.5)
+          if (dist > newDist) {
+            newValue = value
+            newDist = dist
+          }
+        }
+      }
+      newData[y][x] = newValue
+    }
+  }
+  return newData
+}
+
 async function analyze(imageData: ImageData) {
   let selectedClassIndex = -1
   Array.from(classList.children).forEach((button, index) => {
@@ -209,15 +261,22 @@ async function analyze(imageData: ImageData) {
     x = tf.div(x, 255)
     x = tf.expandDims(x, 0)
     let grad = gradFunc(x)
+    // [224, 224, 3] -> [224, 224] by taking average of RGB channels
+    grad = tf.mean(grad, 3) // mean across channel dimension
     let min = tf.min(grad)
     let max = tf.max(grad)
     let range = tf.sub(max, min)
+    // console.log({
+    //   min: min.arraySync(),
+    //   max: max.arraySync(),
+    //   range: range.arraySync(),
+    // })
     let normalized = tf.div(tf.sub(grad, min), range)
-    // [224, 224, 3] -> [224, 224] by taking average of RGB channels
-    let grayscale = tf.mean(normalized, 3) // mean across channel dimension
-    let data = grayscale.arraySync() as number[][][]
+    let data = normalized.arraySync() as number[][][]
     return data[0]
   })
+
+  data = spreadNormalizedGradientsPeaks(data)
 
   let maxClassNameLength = Math.max(
     ...models.classifier.classNames.map(className => className.length),
@@ -231,25 +290,32 @@ async function analyze(imageData: ImageData) {
     .join('\n')
 
   let i = 0
-  let min = 255
-  let max = 0
   for (let y = 0; y < imageData.height; y++) {
     for (let x = 0; x < imageData.width; x++, i += 4) {
-      let grayscale = Math.floor(data[y][x] * 255)
-      min = Math.min(min, grayscale)
-      max = Math.max(max, grayscale)
-      let color = heatmap_values[grayscale]
+      let value = data[y][x]
+      let dist = Math.abs(value - 0.5)
+      let alpha = Math.floor((dist / 0.5) * 255)
+      imageData.data[i + 3] = alpha
+    }
+  }
+  extractedContext.putImageData(imageData, 0, 0)
+  i = 0
+  for (let y = 0; y < imageData.height; y++) {
+    for (let x = 0; x < imageData.width; x++, i += 4) {
+      let value = data[y][x]
+      let index = Math.floor(value * 255)
+      let color = heatmap_values[index]
       // Use the same grayscale value for all RGB channels
       imageData.data[i] = color[0]
       imageData.data[i + 1] = color[1]
       imageData.data[i + 2] = color[2]
       imageData.data[i + 3] = color[3] * 255
+
+      let dist = Math.abs(value - 0.5)
+      let alpha = Math.floor((dist / 0.5) * 255)
     }
   }
-  console.log({ min, max })
-  if (min != max) {
-    camContext.putImageData(imageData, 0, 0)
-  }
+  camContext.putImageData(imageData, 0, 0)
 }
 
 async function loadModels() {
