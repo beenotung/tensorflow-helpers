@@ -89,6 +89,9 @@ export async function loadImageClassifierModel(options: {
 
   async function classifyImageEmbedding(embedding: tf.Tensor) {
     let outputs = tf.tidy(() => {
+      if (embedding.rank === 1) {
+        embedding = tf.expandDims(embedding, 0)
+      }
       let y = classifierModel.predict(embedding) as tf.Tensor
       let probs = tf.squeeze(y, [0])
       return probs
