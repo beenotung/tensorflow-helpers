@@ -187,9 +187,10 @@ async function analyze(imageData: ImageData) {
     let logits = models.classifier.classifierModel.predict(
       embedding,
     ) as tf.Tensor
+    let probs = tf.softmax(logits)
 
     output.logits = (logits.arraySync() as number[][])[0]
-    output.probs = (tf.softmax(logits).arraySync() as number[][])[0]
+    output.probs = (probs.arraySync() as number[][])[0]
 
     // tf.argMax: [1]
     let classIndex: number = selectedClassIndex
