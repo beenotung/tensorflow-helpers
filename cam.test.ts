@@ -16,6 +16,7 @@ let inputCanvas = document.getElementById('inputCanvas') as HTMLCanvasElement
 let camCanvas = document.getElementById('camCanvas') as HTMLCanvasElement
 
 let classList = document.querySelector('.class-list') as HTMLDivElement
+let outputProbs = document.getElementById('outputProbs') as HTMLDivElement
 
 let inputContext = inputCanvas.getContext('2d')!
 let camContext = camCanvas.getContext('2d')!
@@ -169,6 +170,10 @@ async function analyze(imageData: ImageData) {
 
   let models = await modelsP
 
+  let output = {
+    logits: [] as number[],
+    probs: [] as number[],
+  }
   let gradFunc = tf.valueAndGrad(x => {
     // x: [1, 224, 224, 3]
     // embedding: [1, 1280]
@@ -177,6 +182,10 @@ async function analyze(imageData: ImageData) {
     let logits = models.classifier.classifierModel.predict(
       embedding,
     ) as tf.Tensor
+
+    output.logits = (logits.arraySync() as number[][])[0]
+    output.probs = (tf.softmax(logits).arraySync() as number[][])[0]
+
     // tf.argMax: [1]
     let classIndex: number = selectedClassIndex
     if (classIndex == -1) {
@@ -184,6 +193,7 @@ async function analyze(imageData: ImageData) {
       classList.children[classIndex].classList.add('active')
     }
     let classScore = tf.slice(logits, [0, classIndex], [1, 1])
+
     return classScore
   })
 
@@ -202,6 +212,12 @@ async function analyze(imageData: ImageData) {
     let data = grayscale.arraySync() as number[][][]
     return data[0]
   })
+
+  outputProbs.textContent = models.classifier.classNames
+    .map((className, index) => {
+      return `${className}:   \t ${(output.probs[index] * 100).toFixed(1)}% (${output.logits[index].toFixed(3)})`
+    })
+    .join('\n')
 
   let i = 0
   let min = 255
