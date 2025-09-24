@@ -1,6 +1,7 @@
 import * as tf from '@tensorflow/tfjs'
 import { ImageModel, cachedLoadLayersModel } from './model'
 import {
+  ClassificationOptions,
   ClassificationResult,
   calcClassWeight,
   createImageClassifier,
@@ -76,48 +77,57 @@ export async function loadImageClassifierModel(options: {
 
   async function classifyImageUrl(
     url: string,
+    options?: ClassificationOptions,
   ): Promise<ClassificationResult[]> {
     let embedding = await baseModel.imageUrlToEmbedding(url)
     /* do not dispose embedding because it may be cached */
-    return classifyImageEmbedding(embedding)
+    return classifyImageEmbedding(embedding, options)
   }
 
   async function classifyImageFile(
     file: File,
+    options?: ClassificationOptions,
   ): Promise<ClassificationResult[]> {
     let embedding = await baseModel.imageFileToEmbedding(file)
     /* do not dispose embedding because it may be cached */
-    return classifyImageEmbedding(embedding)
+    return classifyImageEmbedding(embedding, options)
   }
 
   async function classifyImage(
     image: Parameters<typeof tf.browser.fromPixels>[0],
+    options?: ClassificationOptions,
   ): Promise<ClassificationResult[]> {
     let imageTensor = await tf.browser.fromPixelsAsync(image)
     let embedding = baseModel.imageTensorToEmbedding(imageTensor)
     imageTensor.dispose()
     /* do not dispose embedding because it may be cached */
-    return classifyImageEmbedding(embedding)
+    return classifyImageEmbedding(embedding, options)
   }
 
   async function classifyImageTensor(
     imageTensor: tf.Tensor3D | tf.Tensor4D,
+    options?: ClassificationOptions,
   ): Promise<ClassificationResult[]> {
     let embedding = baseModel.imageTensorToEmbedding(imageTensor)
-    let results = await classifyImageEmbedding(embedding)
+    let results = await classifyImageEmbedding(embedding, options)
     embedding.dispose()
     return results
   }
 
-  async function classifyImageEmbedding(embedding: tf.Tensor) {
+  async function classifyImageEmbedding(
+    embedding: tf.Tensor,
+    options?: ClassificationOptions,
+  ) {
     let outputs = tf.tidy(() => {
       if (embedding.rank === 1) {
         embedding = tf.expandDims(embedding, 0)
       }
       let y = classifierModel.predict(embedding) as tf.Tensor
       y = tf.squeeze(y, [0])
-      let probs = tf.softmax(y)
-      return probs
+      if (options?.applySoftmax !== false) {
+        y = tf.softmax(y)
+      }
+      return y
     })
     let values = await outputs.data()
     outputs.dispose()

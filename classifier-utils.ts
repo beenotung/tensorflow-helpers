@@ -37,6 +37,11 @@ export function createImageClassifier(spec: ClassifierModelSpec) {
   return attachClassNames(classifierModel, classNames)
 }
 
+export type ClassificationOptions = {
+  /** default: true */
+  applySoftmax?: boolean
+}
+
 export type ClassificationResult = {
   label: string
   /** @description between 0 to 1 */
