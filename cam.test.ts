@@ -1,7 +1,12 @@
 import * as tf from '@tensorflow/tfjs'
 import { loadImageClassifierModel, loadImageModel } from './browser'
+import { generate_heatmap_values, heatmap_schemes } from 'heatmap-values'
 
 console.log('cam.test.ts')
+
+let heatmap_values = generate_heatmap_values(
+  heatmap_schemes.red_transparent_blue,
+)
 
 let catImage = document.getElementById('catImage') as HTMLImageElement
 let dogImage = document.getElementById('dogImage') as HTMLImageElement
@@ -232,11 +237,12 @@ async function analyze(imageData: ImageData) {
       let grayscale = Math.floor(data[y][x] * 255)
       min = Math.min(min, grayscale)
       max = Math.max(max, grayscale)
+      let color = heatmap_values[grayscale]
       // Use the same grayscale value for all RGB channels
-      imageData.data[i] = grayscale
-      imageData.data[i + 1] = grayscale
-      imageData.data[i + 2] = grayscale
-      imageData.data[i + 3] = 255
+      imageData.data[i] = color[0]
+      imageData.data[i + 1] = color[1]
+      imageData.data[i + 2] = color[2]
+      imageData.data[i + 3] = color[3] * 255
     }
   }
   console.log({ min, max })

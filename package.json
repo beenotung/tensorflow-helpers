@@ -67,6 +67,7 @@
     "@tensorflow/tfjs-core": "^4.22.0",
     "@types/node": "^22.14.0",
     "esbuild": "^0.24.2",
+    "heatmap-values": "^1.0.4",
     "mk-package": "^1.0.2",
     "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
