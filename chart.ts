@@ -26,6 +26,8 @@ type ModelNode = {
   inputs: ModelNode[]
   depth: number
   element: HTMLElement
+  inputsLines: SVGLineElement[]
+  outputsLines: SVGLineElement[]
 }
 
 async function main() {
@@ -60,12 +62,44 @@ async function main() {
     element.querySelector<HTMLElement>('.node-op')!.textContent = node.op
     element.querySelector<HTMLElement>('.node-shape')!.textContent =
       shape.join('x')
-    nodes[node.name] = {
+    element.addEventListener('click', () => {
+      if (element.classList.contains('locked')) {
+        element.classList.remove('locked')
+        element.classList.remove('active')
+      } else {
+        element.classList.add('locked')
+      }
+    })
+    element.addEventListener('mouseover', () => {
+      element.classList.add('active')
+      for (let line of modelNode.inputsLines) {
+        line.classList.add('active')
+      }
+      for (let line of modelNode.outputsLines) {
+        line.classList.add('active')
+      }
+    })
+    element.addEventListener('mouseout', () => {
+      if (element.classList.contains('locked')) {
+        return
+      }
+      element.classList.remove('active')
+      for (let line of modelNode.inputsLines) {
+        line.classList.remove('active')
+      }
+      for (let line of modelNode.outputsLines) {
+        line.classList.remove('active')
+      }
+    })
+    let modelNode: ModelNode = {
       node,
       inputs: [],
       depth: 0,
       element,
+      inputsLines: [],
+      outputsLines: [],
     }
+    nodes[node.name] = modelNode
   })
 
   // build connections (from output to input)
@@ -165,6 +199,8 @@ async function main() {
     line.setAttribute('y2', to_y.toString())
     line.setAttribute('stroke', 'black')
     line.setAttribute('stroke-width', '1')
+    inputNode.outputsLines.push(line)
+    outputNode.inputsLines.push(line)
     svg.appendChild(line)
   }
 }
