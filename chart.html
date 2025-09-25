@@ -29,9 +29,10 @@
         border-radius: 0.25rem;
         width: fit-content;
       }
-      .node-canvas {
+      .node-svg {
         position: absolute;
         inset: 0;
+        pointer-events: none;
       }
     </style>
   </head>
@@ -45,7 +46,7 @@
           <div>depth: <span class="node-depth">0</span></div>
           <div>shape: <span class="node-shape">224x224x3</span></div>
         </div>
-        <canvas class="node-canvas"></canvas>
+        <svg class="node-svg"></svg>
       </div>
     </div>
     <script src="chart.bundle.js"></script>

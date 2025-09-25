@@ -4,8 +4,7 @@ import { loadImageModel, ModelArtifacts } from './browser'
 let chartName = document.querySelector<HTMLElement>('.chart-name')!
 let chartNodes = document.querySelector<HTMLElement>('.chart-nodes')!
 
-let canvas = document.querySelector<HTMLCanvasElement>('.node-canvas')!
-let context = canvas.getContext('2d')!
+let svg = document.querySelector<SVGSVGElement>('.node-svg')!
 
 let nodeTemplate = chartNodes.querySelector<HTMLElement>('.node')!
 
@@ -141,16 +140,15 @@ async function main() {
       maxBottom = Math.max(maxBottom, rect.bottom)
     }
   }
-  /* scan down the canvas to reduce memory usage */
-  let scale = 2
-  canvas.width = maxRight / scale
-  canvas.height = maxBottom / scale
-  canvas.style.width = `${maxRight}px`
-  canvas.style.height = `${maxBottom}px`
-  console.log('canvas size:', (canvas.width * canvas.height).toLocaleString())
-  context.clearRect(0, 0, canvas.width, canvas.height)
-  context.strokeStyle = 'black'
-  context.lineWidth = 1
+  // Set SVG dimensions
+  svg.setAttribute('width', maxRight.toString())
+  svg.setAttribute('height', maxBottom.toString())
+  svg.setAttribute('viewBox', `0 0 ${maxRight} ${maxBottom}`)
+
+  // Clear existing connections
+  svg.innerHTML = ''
+
+  // Create connections as SVG lines
   let chartRect = chartNodes.getBoundingClientRect()
   for (let [inputNode, outputNode] of connections) {
     let inputRect = inputNode.element.getBoundingClientRect()
@@ -159,10 +157,15 @@ async function main() {
     let to_x = (outputRect.right + outputRect.left) / 2 - chartRect.left
     let from_y = inputRect.bottom - chartRect.top
     let to_y = outputRect.top - chartRect.top
-    context.beginPath()
-    context.moveTo(from_x / scale, from_y / scale)
-    context.lineTo(to_x / scale, to_y / scale)
-    context.stroke()
+
+    let line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
+    line.setAttribute('x1', from_x.toString())
+    line.setAttribute('y1', from_y.toString())
+    line.setAttribute('x2', to_x.toString())
+    line.setAttribute('y2', to_y.toString())
+    line.setAttribute('stroke', 'black')
+    line.setAttribute('stroke-width', '1')
+    svg.appendChild(line)
   }
 }
 
