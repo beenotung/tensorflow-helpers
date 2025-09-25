@@ -23,12 +23,8 @@ type ModelTopologyNode = {
 }
 
 type ModelNode = {
-  index: number
   node: ModelTopologyNode
-  shape: number[]
-  visited: boolean
   inputs: ModelNode[]
-  outputs: ModelNode[]
   depth: number
   element: HTMLElement
 }
@@ -66,12 +62,8 @@ async function main() {
     element.querySelector<HTMLElement>('.node-shape')!.textContent =
       shape.join('x')
     nodes[node.name] = {
-      index,
       node,
-      shape,
-      visited: false,
       inputs: [],
-      outputs: [],
       depth: 0,
       element,
     }
@@ -79,42 +71,52 @@ async function main() {
 
   // build connections (from output to input)
   let connections: [from: ModelNode, to: ModelNode][] = []
-  let stack = [nodes[outputNodeName]]
-  Object.values(nodes).forEach(node => {
-    node.visited = false
-  })
-  for (;;) {
-    let outputNode = stack.pop()
-    if (!outputNode) {
-      break
+  let visited = new Set<ModelNode>()
+  function addConnection(outputNode: ModelNode) {
+    if (visited.has(outputNode)) {
+      return
     }
-    if (outputNode.visited) {
-      continue
-    }
-    outputNode.visited = true
-    // console.log('node:', outputNode.node.name)
+    visited.add(outputNode)
     if (outputNode.node.input) {
       for (let nodeName of outputNode.node.input) {
         if (nodeName == '^inputs' && outputNode.node.op == 'Const') {
           continue
         }
         let inputNode = nodes[nodeName]
-        inputNode.depth = Math.max(outputNode.depth + 1, inputNode.depth)
+        if (!inputNode) {
+          console.error('inputNode not found:', nodeName)
+          continue
+        }
         outputNode.inputs.push(inputNode)
-        inputNode.outputs.push(outputNode)
         connections.push([inputNode, outputNode])
-        stack.push(inputNode)
+        addConnection(inputNode)
       }
     }
   }
+  addConnection(nodes[outputNodeName])
   console.log('total connections:', connections.length.toLocaleString())
+
+  // calculate depth (from output to input)
+  let stack = [nodes[outputNodeName]]
+  while (stack.length > 0) {
+    let outputNode = stack.shift()!
+    for (let inputNode of outputNode.inputs) {
+      if (inputNode.depth < outputNode.depth + 1) {
+        inputNode.depth = outputNode.depth + 1
+        if (!stack.includes(inputNode)) {
+          stack.push(inputNode)
+        }
+      }
+    }
+  }
 
   // build chart (from input to output)
   let nodesArray = Object.values(nodes)
   let maxDepth = Math.max(...nodesArray.map(node => node.depth))
+  console.log('maxDepth:', maxDepth)
   nodesArray.forEach(node => {
     node.depth = maxDepth - node.depth
-    console.log('depth:', node.depth, node.node.name)
+    // console.log('depth:', node.depth, node.node.name)
   })
   let padding = 32
   let height = 64 * 3.5
@@ -139,9 +141,16 @@ async function main() {
       maxBottom = Math.max(maxBottom, rect.bottom)
     }
   }
-  canvas.width = maxRight
-  canvas.height = maxBottom
+  /* scan down the canvas to reduce memory usage */
+  let scale = 2
+  canvas.width = maxRight / scale
+  canvas.height = maxBottom / scale
+  canvas.style.width = `${maxRight}px`
+  canvas.style.height = `${maxBottom}px`
+  console.log('canvas size:', (canvas.width * canvas.height).toLocaleString())
   context.clearRect(0, 0, canvas.width, canvas.height)
+  context.strokeStyle = 'black'
+  context.lineWidth = 1
   let chartRect = chartNodes.getBoundingClientRect()
   for (let [inputNode, outputNode] of connections) {
     let inputRect = inputNode.element.getBoundingClientRect()
@@ -151,8 +160,8 @@ async function main() {
     let from_y = inputRect.bottom - chartRect.top
     let to_y = outputRect.top - chartRect.top
     context.beginPath()
-    context.moveTo(from_x, from_y)
-    context.lineTo(to_x, to_y)
+    context.moveTo(from_x / scale, from_y / scale)
+    context.lineTo(to_x / scale, to_y / scale)
     context.stroke()
   }
 }
