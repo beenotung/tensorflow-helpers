@@ -1,5 +1,9 @@
 import * as tf from '@tensorflow/tfjs'
-import { loadImageModel, ModelArtifacts } from './browser'
+import {
+  loadImageModel,
+  ModelArtifacts,
+  PreTrainedImageModels,
+} from './browser'
 
 let chartName = document.querySelector<HTMLElement>('.chart-name')!
 let chartNodes = document.querySelector<HTMLElement>('.chart-nodes')!
@@ -31,25 +35,32 @@ type ModelNode = {
 }
 
 async function main() {
-  let model = await loadImageModel({
-    url: 'saved_model/mobilenet-v3-large-100',
-    cacheUrl: 'indexeddb://mobilenet-v3-large-100',
-    checkForUpdates: false,
-  })
+  let model = await tf.loadGraphModel(
+    // PreTrainedImageModels.mobilenet['mobilenet-v3-large-100'].url,
+    // 'saved_models/mobilenet-v3-tfjs-large-100-224-classification-v1/model.json',
+    'saved_models/mobilenet-v3-tfjs-large-100-224-feature-vector-v1/model.json',
+    // 'saved_models/yolo11n_web_model/model.json',
+  )
   console.log('model:', model)
-  chartName.textContent = model.spec.url
+  // chartName.textContent = 'Mobilenet V3 Large 100 Classification'
+  chartName.textContent = 'Mobilenet V3 Large 100 Feature Vector'
+  // chartName.textContent = 'YOLO11n Web Model'
 
-  let inputNodeName = model.model.inputs[0].name
+  let inputNodeName = model.inputs[0].name
   console.log('inputNodeName:', inputNodeName)
 
-  let outputNodeName = model.model.outputs[0].name
+  let outputNodeName = model.outputs[0].name
   console.log('outputNodeName:', outputNodeName)
 
-  let artifacts = (model.model as any).artifacts as LoadedModelArtifacts
+  let artifacts = (model as any).artifacts as LoadedModelArtifacts
   console.log('artifacts:', artifacts)
 
-  let result = model.model.execute(
-    tf.zeros([1, 224, 224, 3]),
+  let inputShape = model.inputs[0].shape!
+  if (inputShape[0] == -1) {
+    inputShape[0] = 1
+  }
+  let result = model.execute(
+    tf.zeros(inputShape),
     artifacts.modelTopology.node.map(node => node.name),
   ) as tf.Tensor[]
   console.log('result:', result)
