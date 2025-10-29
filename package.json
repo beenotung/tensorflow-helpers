@@ -32,6 +32,9 @@
   "files": [
     "dist"
   ],
+  "bin": {
+    "download-tfjs-model": "./download-tfjs-model.js"
+  },
   "scripts": {
     "dev": "npm run bundle -- --watch",
     "dev:chart": "npm run bundle:chart -- --watch",
