@@ -126,6 +126,10 @@ async function main() {
         if (nodeName == '^inputs' && outputNode.node.op == 'Const') {
           continue
         }
+
+        // 'model_26/tf.split_1/split:102' -> 'model_26/tf.split_1/split'
+        nodeName = nodeName.split(':')[0]
+
         let inputNode = nodes[nodeName]
         if (!inputNode) {
           console.error('inputNode not found:', nodeName)
