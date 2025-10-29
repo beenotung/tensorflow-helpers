@@ -1,5 +1,9 @@
 import * as tf from '@tensorflow/tfjs'
-import { ModelArtifacts } from '@tensorflow/tfjs-core/dist/io/types'
+import {
+  IOHandler,
+  ModelArtifacts,
+  WeightsManifestEntry,
+} from '@tensorflow/tfjs-core/dist/io/types'
 import { getLastSpatialNodeName } from '../spatial-utils'
 import {
   CropAndResizeAspectRatio,
@@ -7,13 +11,15 @@ import {
   cropAndResizeImageTensor,
 } from '../image-utils'
 import { ImageModelSpec, SpatialFeatures } from '../image-model'
+import { getClassCount } from '../classifier-utils'
+import { ImageEmbeddingOptions } from '../model-utils'
 import {
   attachClassNames,
   checkClassNames,
-  getClassCount,
-  ModelArtifactsWithClassNames,
-} from '../classifier-utils'
-import { ImageEmbeddingOptions } from '../model-utils'
+  patchLoadedModelJSON,
+  SavedModelJSON,
+} from '../internal'
+import { getModelArtifacts } from '../model-artifacts'
 
 async function readFile(url: string) {
   let res = await fetch(url)
@@ -33,6 +39,35 @@ async function readJSON(url: string) {
   }
   let json = await res.json()
   return json
+}
+
+async function loadModelArtifact(
+  urlPrefix: string,
+  modelArtifact: SavedModelJSON,
+): Promise<void> {
+  let weightData = modelArtifact.weightData || []
+  if (!Array.isArray(weightData)) {
+    weightData = [weightData]
+  }
+  modelArtifact.weightData = weightData
+
+  let weightSpecs: WeightsManifestEntry[] | null = null
+  if (!modelArtifact.weightSpecs) {
+    weightSpecs = []
+    modelArtifact.weightSpecs = weightSpecs
+  }
+
+  let i = 0
+  for (let weightsManifest of modelArtifact.weightsManifest) {
+    for (let path of weightsManifest.paths) {
+      let buffer = await loadWeightData(urlPrefix + '/' + path)
+      modelArtifact.weightData[i] = buffer
+      i++
+    }
+    if (weightSpecs) {
+      weightSpecs.push(...weightsManifest.weights)
+    }
+  }
 }
 
 function removeModelUrlPrefix(url: string) {
@@ -76,22 +111,12 @@ export async function loadGraphModel(options: {
 }) {
   let url = removeModelUrlPrefix(options.url)
   let classNames = options.classNames
-  let model = await tf.loadGraphModel({
+  let modelArtifact: SavedModelJSON = await readJSON(url + '/model.json')
+  patchLoadedModelJSON(modelArtifact)
+  classNames = checkClassNames(modelArtifact, classNames)
+  let model: tf.GraphModel<IOHandler> = await tf.loadGraphModel({
     async load() {
-      let modelArtifact: ModelArtifactsWithClassNames = await readJSON(
-        url + '/model.json',
-      )
-      classNames = checkClassNames(modelArtifact, classNames)
-      let weights = modelArtifact.weightData
-      if (!weights) {
-        throw new Error('missing weightData')
-      }
-      if (!Array.isArray(weights)) {
-        weights = [weights]
-      }
-      for (let i = 0; i < weights.length; i++) {
-        weights[i] = await loadWeightData(url + `/weight-${i}.bin`)
-      }
+      await loadModelArtifact(url, modelArtifact)
       return modelArtifact
     },
   })
@@ -135,7 +160,7 @@ async function cachedLoadModel<
     try {
       let model = await loadLocalModel()
       model.classNames ||= localCacheInfo.classNames
-      classNames = checkClassNames(model, classNames)
+      classNames = checkClassNames(getModelArtifacts(model), classNames)
       return attachClassNames(model, classNames)
     } catch (error) {
       if (!String(error).includes('Cannot find model with path')) {
@@ -146,7 +171,7 @@ async function cachedLoadModel<
 
   let _model = await loadRemoteModel()
   _model.classNames ||= await getModelClassNames(modelUrl)
-  classNames = checkClassNames(_model, classNames)
+  classNames = checkClassNames(getModelArtifacts(_model), classNames)
   let model = attachClassNames(_model, classNames)
 
   await model.save(cacheUrl)
@@ -192,23 +217,12 @@ export async function loadLayersModel(options: {
 }) {
   let url = removeModelUrlPrefix(options.url)
   let classNames = options.classNames
+  let modelArtifact: SavedModelJSON = await readJSON(url + '/model.json')
+  patchLoadedModelJSON(modelArtifact)
+  classNames = checkClassNames(modelArtifact, classNames)
   let model = await tf.loadLayersModel({
     async load() {
-      let modelArtifact: ModelArtifactsWithClassNames = await readJSON(
-        url + '/model.json',
-      )
-      classNames = checkClassNames(modelArtifact, classNames)
-      let weights = modelArtifact.weightData
-      if (!weights) {
-        throw new Error('missing weightData')
-      }
-      if (!Array.isArray(weights)) {
-        modelArtifact.weightData = await loadWeightData(url + `/weight-0.bin`)
-        return modelArtifact
-      }
-      for (let i = 0; i < weights.length; i++) {
-        weights[i] = await loadWeightData(url + `/weight-${i}.bin`)
-      }
+      await loadModelArtifact(url, modelArtifact)
       return modelArtifact
     },
   })

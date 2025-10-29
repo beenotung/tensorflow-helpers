@@ -1,4 +1,5 @@
 import * as tf from '@tensorflow/tfjs'
+import { attachClassNames } from './internal'
 
 export type ClassifierModelSpec = {
   embeddingFeatures: number
@@ -114,37 +115,4 @@ export function calcClassWeight(options: {
     count => total / options.classes / count,
   )
   return classWeights
-}
-
-export type IOHandler = Exclude<Parameters<tf.GraphModel['save']>[0], string>
-export type ModelArtifacts = Parameters<Required<IOHandler>['save']>[0]
-export type SaveResult = ReturnType<Required<IOHandler>['save']>
-
-export type ModelArtifactsWithClassNames = ModelArtifacts & {
-  classNames?: string[]
-}
-
-export function checkClassNames(
-  modelArtifact: { classNames?: string[] },
-  classNames: undefined | string[],
-): undefined | string[] {
-  if (classNames && modelArtifact.classNames) {
-    let expected = JSON.stringify(classNames)
-    let actual = JSON.stringify(modelArtifact.classNames)
-    if (actual !== expected) {
-      throw new Error(
-        `classNames mismatch, expected: ${expected}, actual: ${actual}`,
-      )
-    }
-  }
-  return !classNames && modelArtifact.classNames
-    ? modelArtifact.classNames
-    : classNames
-}
-
-export function attachClassNames<Model extends object>(
-  model: Model,
-  classNames: undefined | string[],
-): Model & { classNames?: string[] } {
-  return classNames ? Object.assign(model, { classNames }) : model
 }

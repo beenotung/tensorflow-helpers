@@ -1,9 +1,9 @@
 import * as tf from '@tensorflow/tfjs'
 import {
   loadImageModel,
-  ModelArtifacts,
   PreTrainedImageModels,
 } from './browser'
+import { ModelArtifacts } from '@tensorflow/tfjs-core/dist/io/types'
 
 let chartName = document.querySelector<HTMLElement>('.chart-name')!
 let chartNodes = document.querySelector<HTMLElement>('.chart-nodes')!
