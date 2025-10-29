@@ -42,7 +42,7 @@
     "bundle:chart": "esbuild chart.ts --bundle --outfile=chart.bundle.js",
     "test": "tsc --noEmit",
     "clean": "rimraf dist",
-    "build": "rimraf dist && tsc -p . && rimraf dist/*.{tsbuildinfo,test.d.ts,test.js} && mk-package",
+    "build": "rimraf dist && tsc -p . && rimraf dist/*.{tsbuildinfo,test.d.ts,test.js} && rimraf dist/chart.* && mk-package",
     "tsc": "tsc -p ."
   },
   "dependencies": {
