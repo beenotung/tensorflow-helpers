@@ -2,8 +2,8 @@
 
 import * as tf from '@tensorflow/tfjs'
 import { mkdirSync } from 'fs'
-import { join } from 'path'
-import { saveModel } from './model'
+import { dirname, join } from 'path'
+import { loadGraphModel, loadLayersModel, saveModel } from './model'
 import { getModelArtifacts } from './model-artifacts'
 
 let helpMessage = `
@@ -70,18 +70,23 @@ async function loadModel(
   try {
     // try layered model
     if (source.startsWith('file://')) {
-      return await tf.loadLayersModel(source)
+      return await loadLayersModel({ dir: toDir(source) })
     } else {
       return await tf.loadLayersModel(source, { fromTFHub: true })
     }
   } catch {
     // try graph model
     if (source.startsWith('file://')) {
-      return await tf.loadGraphModel(source)
+      return await loadGraphModel({ dir: toDir(source) })
     } else {
       return await tf.loadGraphModel(source, { fromTFHub: true })
     }
   }
+}
+
+function toDir(source: string): string {
+  source = source.replace('file://', '')
+  return dirname(source)
 }
 
 main()
