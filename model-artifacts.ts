@@ -22,11 +22,27 @@ export function getModelArtifacts<Model extends object>(
 }
 
 export function exposeModelArtifacts<Model extends object>(model: Model) {
-  let artifacts = getModelArtifacts(model)
-  return Object.assign(model, {
-    getArtifacts: () => artifacts,
-    get classNames() {
-      return artifacts.userDefinedMetadata?.classNames
-    },
+  // Add methods directly to the original model object
+  Object.defineProperty(model, 'getArtifacts', {
+    value: () => getModelArtifacts(model),
+    writable: false,
+    enumerable: false,
+    configurable: true,
   })
+
+  Object.defineProperty(model, 'classNames', {
+    get: () => getModelArtifacts(model).userDefinedMetadata?.classNames,
+    set: (value: string[]) => {
+      const artifacts = getModelArtifacts(model)
+      artifacts.userDefinedMetadata ||= {}
+      artifacts.userDefinedMetadata.classNames = value
+    },
+    enumerable: true,
+    configurable: true,
+  })
+
+  return model as Model & {
+    getArtifacts: () => PatchedModelArtifacts
+    classNames?: string[]
+  }
 }
