@@ -23,7 +23,7 @@ async function readFile(url: string) {
 
 async function loadWeightData(file: string) {
   let buffer = await readFile(file)
-  return new Uint8Array(buffer)
+  return new Uint8Array(buffer).buffer
 }
 
 async function readJSON(url: string) {

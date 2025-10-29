@@ -127,7 +127,7 @@ export async function loadLayersModel(options: {
 
 async function loadWeightData(file: string) {
   let buffer = await readFile(file)
-  return new Uint8Array(buffer)
+  return new Uint8Array(buffer).buffer
 }
 
 export async function cachedLoadGraphModel(options: {
