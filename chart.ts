@@ -1,8 +1,5 @@
 import * as tf from '@tensorflow/tfjs'
-import {
-  loadImageModel,
-  PreTrainedImageModels,
-} from './browser'
+import { loadGraphModel } from './browser/model'
 import { ModelArtifacts } from '@tensorflow/tfjs-core/dist/io/types'
 
 let chartName = document.querySelector<HTMLElement>('.chart-name')!
@@ -35,16 +32,32 @@ type ModelNode = {
 }
 
 async function main() {
-  let model = await tf.loadGraphModel(
-    // PreTrainedImageModels.mobilenet['mobilenet-v3-large-100'].url,
-    // 'saved_models/mobilenet-v3-tfjs-large-100-224-classification-v1/model.json',
-    'saved_models/mobilenet-v3-tfjs-large-100-224-feature-vector-v1/model.json',
-    // 'saved_models/yolo11n_web_model/model.json',
-  )
+  let modelSources = [
+    {
+      url: 'saved_models/mobilenet-v3-tfjs-large-100-224-classification-v1/model.json',
+      name: 'Mobilenet V3 Large 100 Classification',
+    },
+    {
+      url: 'saved_models/mobilenet-v3-tfjs-large-100-224-feature-vector-v1/model.json',
+      name: 'Mobilenet V3 Large 100 Feature Vector',
+    },
+    {
+      url: 'saved_model/mobilenet-v2-035-128-feature-vector/model.json',
+      name: 'Mobilenet V2 035-128 Feature Vector',
+    },
+    {
+      url: 'saved_models/yolo11n_web_model/model.json',
+      name: 'YOLO11n Web Model',
+    },
+    {
+      url: 'saved_models/yolo11n_web_model_saved/model.json',
+      name: 'YOLO11n Web Model Saved',
+    },
+  ]
+  let modelSource = modelSources[4]
+  let model = await loadGraphModel({ url: modelSource.url })
   console.log('model:', model)
-  // chartName.textContent = 'Mobilenet V3 Large 100 Classification'
-  chartName.textContent = 'Mobilenet V3 Large 100 Feature Vector'
-  // chartName.textContent = 'YOLO11n Web Model'
+  chartName.textContent = modelSource.name
 
   let inputNodeName = model.inputs[0].name
   console.log('inputNodeName:', inputNodeName)
