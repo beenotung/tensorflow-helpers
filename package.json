@@ -35,8 +35,11 @@
   "scripts": {
     "dev": "npm run bundle -- --watch",
     "dev:cam": "npm run bundle:cam -- --watch",
+    "dev:cam-layer": "npm run bundle:cam-layer -- --watch",
     "bundle": "esbuild browser.test.ts --bundle --outfile=bundle.js",
     "bundle:cam": "esbuild cam.test.ts --bundle --outfile=cam.bundle.js",
+    "bundle:cam-layer": "esbuild cam-layer-specific.test.ts --bundle --outfile=cam-layer.bundle.js",
+    "bundle:random-demo": "esbuild random-classifier-demo.test.ts --bundle --outfile=random-classifier-demo.bundle.js",
     "test": "tsc --noEmit",
     "clean": "rimraf dist",
     "build": "rimraf dist && tsc -p . && rimraf dist/*.{tsbuildinfo,test.d.ts,test.js} && mk-package",
