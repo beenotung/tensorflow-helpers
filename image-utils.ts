@@ -28,28 +28,31 @@ export function calcCropBox(options: {
 }): Box {
   let { sourceShape, targetShape } = options
 
+  let sourceRatio = sourceShape.width / sourceShape.height
+  let targetRatio = targetShape.width / targetShape.height
+
   let top = 0
   let left = 0
   let bottom = 1
   let right = 1
 
-  if (
-    sourceShape.width > sourceShape.height ==
-    targetShape.width > targetShape.height
-  ) {
-    let targetHeightInRatio =
-      (sourceShape.height / sourceShape.width) * targetShape.width
-    top =
-      Math.abs(targetHeightInRatio - targetShape.height) /
-      targetHeightInRatio /
-      2
-    bottom = 1 - top
-  } else {
-    let targetWidthInRatio =
-      (sourceShape.width / sourceShape.height) * targetShape.height
-    left =
-      Math.abs(targetWidthInRatio - targetShape.width) / targetWidthInRatio / 2
+  // source too wide -> crop left/right
+  if (sourceRatio > targetRatio) {
+    let newWidth = targetRatio * sourceShape.height
+    left = (sourceShape.width - newWidth) / 2 / sourceShape.width
     right = 1 - left
+  }
+
+  // source too tall -> crop top/bottom
+  else if (sourceRatio < targetRatio) {
+    let newHeight = sourceShape.width / targetRatio
+    top = (sourceShape.height - newHeight) / 2 / sourceShape.height
+    bottom = 1 - top
+  }
+
+  // same ratio -> no crop
+  else {
+    // use the full range as default (from 0 to 1)
   }
 
   return [top, left, bottom, right]

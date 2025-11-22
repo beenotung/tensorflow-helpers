@@ -9,9 +9,11 @@ dist/
 *.tgz
 .DS_Store
 dataset/
+samples/
 saved_model/
 saved_models/
 image.jpg
 bundle.js
+*.bundle.js
 data.json
 *-data.json

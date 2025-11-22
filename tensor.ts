@@ -10,6 +10,7 @@ export function disposeTensor(tensor: tf.Tensor | tf.Tensor[]) {
   }
 }
 
+/** @deprecated recommend to explore the model output shape at dev time, and use tf.squeeze() when needed */
 export function toOneTensor(
   tensor: tf.Tensor | tf.Tensor[] | tf.NamedTensorMap,
 ): tf.Tensor {

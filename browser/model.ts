@@ -1,5 +1,9 @@
 import * as tf from '@tensorflow/tfjs'
-import { ModelArtifacts } from '@tensorflow/tfjs-core/dist/io/types'
+import {
+  IOHandler,
+  ModelArtifacts,
+  WeightsManifestEntry,
+} from '@tensorflow/tfjs-core/dist/io/types'
 import { getLastSpatialNodeName } from '../spatial-utils'
 import {
   CropAndResizeAspectRatio,
@@ -7,12 +11,15 @@ import {
   cropAndResizeImageTensor,
 } from '../image-utils'
 import { ImageModelSpec, SpatialFeatures } from '../image-model'
-import { toOneTensor } from '../tensor'
+import { getClassCount } from '../classifier-utils'
+import { ImageEmbeddingOptions } from '../model-utils'
 import {
   attachClassNames,
   checkClassNames,
-  ModelArtifactsWithClassNames,
-} from '../classifier-utils'
+  patchLoadedModelJSON,
+  SavedModelJSON,
+} from '../internal'
+import { getModelArtifacts } from '../model-artifacts'
 
 async function readFile(url: string) {
   let res = await fetch(url)
@@ -22,7 +29,7 @@ async function readFile(url: string) {
 
 async function loadWeightData(file: string) {
   let buffer = await readFile(file)
-  return new Uint8Array(buffer)
+  return new Uint8Array(buffer).buffer
 }
 
 async function readJSON(url: string) {
@@ -32,6 +39,35 @@ async function readJSON(url: string) {
   }
   let json = await res.json()
   return json
+}
+
+async function loadModelArtifact(
+  urlPrefix: string,
+  modelArtifact: SavedModelJSON,
+): Promise<void> {
+  let weightData = modelArtifact.weightData || []
+  if (!Array.isArray(weightData)) {
+    weightData = [weightData]
+  }
+  modelArtifact.weightData = weightData
+
+  let weightSpecs: WeightsManifestEntry[] | null = null
+  if (!modelArtifact.weightSpecs) {
+    weightSpecs = []
+    modelArtifact.weightSpecs = weightSpecs
+  }
+
+  let i = 0
+  for (let weightsManifest of modelArtifact.weightsManifest) {
+    for (let path of weightsManifest.paths) {
+      let buffer = await loadWeightData(urlPrefix + '/' + path)
+      modelArtifact.weightData[i] = buffer
+      i++
+    }
+    if (weightSpecs) {
+      weightSpecs.push(...weightsManifest.weights)
+    }
+  }
 }
 
 function removeModelUrlPrefix(url: string) {
@@ -55,6 +91,17 @@ async function getLastModified(url: string) {
   return text ? new Date(text).getTime() : Date.now()
 }
 
+async function getModelClassNames(url: string): Promise<string[] | undefined> {
+  url = removeModelUrlPrefix(url)
+  url += '/model.json'
+  let res = await fetch(url)
+  if (res.status == 404) {
+    throw new Error('file not found: ' + url)
+  }
+  let json = await res.json()
+  return json.classNames || undefined
+}
+
 /**
  * @example `loadGraphModel({ url: 'saved_model/mobilenet-v3-large-100' })`
  */
@@ -64,22 +111,12 @@ export async function loadGraphModel(options: {
 }) {
   let url = removeModelUrlPrefix(options.url)
   let classNames = options.classNames
-  let model = await tf.loadGraphModel({
+  let modelArtifact: SavedModelJSON = await readJSON(url + '/model.json')
+  patchLoadedModelJSON(modelArtifact)
+  classNames = checkClassNames(modelArtifact, classNames)
+  let model: tf.GraphModel<IOHandler> = await tf.loadGraphModel({
     async load() {
-      let modelArtifact: ModelArtifactsWithClassNames = await readJSON(
-        url + '/model.json',
-      )
-      classNames = checkClassNames(modelArtifact, classNames)
-      let weights = modelArtifact.weightData
-      if (!weights) {
-        throw new Error('missing weightData')
-      }
-      if (!Array.isArray(weights)) {
-        weights = [weights]
-      }
-      for (let i = 0; i < weights.length; i++) {
-        weights[i] = await loadWeightData(url + `/weight-${i}.bin`)
-      }
+      await loadModelArtifact(url, modelArtifact)
       return modelArtifact
     },
   })
@@ -101,13 +138,14 @@ async function cachedLoadModel<
   let { options, loadRemoteModel, loadLocalModel } = args
   let { url: modelUrl, cacheUrl, classNames } = options
 
-  let localLastModified = +localStorage.getItem(cacheUrl)!
+  let localCacheInfo: LocalCacheInfo = loadLocalCacheInfo(cacheUrl)
+
   let checkTime = Date.now()
   let remoteLastModified = options.checkForUpdates
     ? await getLastModified(modelUrl).catch(error => {
-        if (localLastModified) {
+        if (localCacheInfo.lastModified) {
           // skip checking if offline and already cached
-          return localLastModified
+          return localCacheInfo.lastModified
         }
         // throw error if offline without pre-cached copy
         throw error
@@ -115,12 +153,14 @@ async function cachedLoadModel<
     : 0
 
   if (
-    localLastModified &&
-    (!options.checkForUpdates || localLastModified == remoteLastModified)
+    localCacheInfo.lastModified &&
+    (!options.checkForUpdates ||
+      localCacheInfo.lastModified == remoteLastModified)
   ) {
     try {
       let model = await loadLocalModel()
-      classNames = checkClassNames(model, classNames)
+      model.classNames ||= localCacheInfo.classNames
+      classNames = checkClassNames(getModelArtifacts(model), classNames)
       return attachClassNames(model, classNames)
     } catch (error) {
       if (!String(error).includes('Cannot find model with path')) {
@@ -130,13 +170,42 @@ async function cachedLoadModel<
   }
 
   let _model = await loadRemoteModel()
-  classNames = checkClassNames(_model, classNames)
+  _model.classNames ||= await getModelClassNames(modelUrl)
+  classNames = checkClassNames(getModelArtifacts(_model), classNames)
   let model = attachClassNames(_model, classNames)
 
   await model.save(cacheUrl)
-  localStorage.setItem(cacheUrl, (remoteLastModified || checkTime).toString())
+  localCacheInfo = {
+    lastModified: remoteLastModified || checkTime,
+    classNames,
+  }
+  localStorage.setItem(cacheUrl, JSON.stringify(localCacheInfo))
 
   return model
+}
+
+type LocalCacheInfo = {
+  lastModified: number
+  classNames?: string[]
+}
+
+function loadLocalCacheInfo(cacheUrl: string): LocalCacheInfo {
+  let text = localStorage.getItem(cacheUrl)
+  let fallback: LocalCacheInfo = { lastModified: 0 }
+  try {
+    let json = JSON.parse(text || '{}') as LocalCacheInfo
+    if (+json) {
+      // old version, only having timestamp
+      return fallback
+    }
+    if (json.lastModified) {
+      // new version, having timestamp and classNames
+      return json
+    }
+    return fallback
+  } catch (error) {
+    return fallback
+  }
 }
 
 /**
@@ -148,26 +217,23 @@ export async function loadLayersModel(options: {
 }) {
   let url = removeModelUrlPrefix(options.url)
   let classNames = options.classNames
+  let modelArtifact: SavedModelJSON = await readJSON(url + '/model.json')
+  patchLoadedModelJSON(modelArtifact)
+  classNames = checkClassNames(modelArtifact, classNames)
   let model = await tf.loadLayersModel({
     async load() {
-      let modelArtifact: ModelArtifactsWithClassNames = await readJSON(
-        url + '/model.json',
-      )
-      classNames = checkClassNames(modelArtifact, classNames)
-      let weights = modelArtifact.weightData
-      if (!weights) {
-        throw new Error('missing weightData')
-      }
-      if (!Array.isArray(weights)) {
-        modelArtifact.weightData = await loadWeightData(url + `/weight-0.bin`)
-        return modelArtifact
-      }
-      for (let i = 0; i < weights.length; i++) {
-        weights[i] = await loadWeightData(url + `/weight-${i}.bin`)
-      }
+      await loadModelArtifact(url, modelArtifact)
       return modelArtifact
     },
   })
+  if (classNames) {
+    let classCount = getClassCount(model.outputShape)
+    if (classCount != classNames.length) {
+      throw new Error(
+        `number of classes mismatch, expected: ${classNames.length}, got: ${classCount}`,
+      )
+    }
+  }
   return attachClassNames(model, classNames)
 }
 
@@ -395,13 +461,16 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     }
   }
 
-  async function imageUrlToEmbedding(url: string): Promise<tf.Tensor> {
+  async function imageUrlToEmbedding(
+    url: string,
+    options?: ImageEmbeddingOptions,
+  ): Promise<tf.Tensor> {
     let embedding = checkCache(url)
     if (embedding) return embedding
 
     let imageTensor = await loadImageCropped(url)
 
-    embedding = imageTensorToEmbedding(imageTensor)
+    embedding = imageTensorToEmbedding(imageTensor, options)
     imageTensor.dispose()
 
     if (cache && isContentHash(url)) {
@@ -411,7 +480,10 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     return embedding
   }
 
-  async function imageFileToEmbedding(file: File): Promise<tf.Tensor> {
+  async function imageFileToEmbedding(
+    file: File,
+    options?: ImageEmbeddingOptions,
+  ): Promise<tf.Tensor> {
     let filename = file.name
     let embedding = checkCache(filename)
     if (embedding) return embedding
@@ -425,7 +497,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
 
     let imageTensor = await loadImageCropped(url)
 
-    embedding = imageTensorToEmbedding(imageTensor)
+    embedding = imageTensorToEmbedding(imageTensor, options)
     imageTensor.dispose()
 
     if (cache && isContentHash(filename)) {
@@ -435,7 +507,10 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     return embedding
   }
 
-  function imageTensorToEmbedding(imageTensor: ImageTensor): tf.Tensor {
+  function imageTensorToEmbedding(
+    imageTensor: ImageTensor,
+    options?: ImageEmbeddingOptions,
+  ): tf.Tensor {
     return tf.tidy(() => {
       let inputTensor = cropAndResizeImageTensor({
         imageTensor,
@@ -443,8 +518,10 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
         height,
         aspectRatio,
       })
-      let outputs = model.predict(inputTensor)
-      let embedding = toOneTensor(outputs)
+      let embedding = model.predict(inputTensor) as tf.Tensor
+      if (options?.squeeze) {
+        embedding = tf.squeeze(embedding, [0])
+      }
       return embedding
     })
   }

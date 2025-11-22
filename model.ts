@@ -1,7 +1,7 @@
 import * as tf from '@tensorflow/tfjs'
 import sharp, { Sharp } from 'sharp'
 import { existsSync, mkdirSync } from 'fs'
-import { readFile, writeFile } from 'fs/promises'
+import { mkdir, readFile, writeFile } from 'fs/promises'
 import { basename, join } from 'path'
 import {
   CropAndResizeAspectRatio,
@@ -9,21 +9,27 @@ import {
   cropAndResizeImageTensor,
   loadImageFile,
 } from './image'
+import { imageSharpToTensor } from './image-utils'
 import { isContentHash } from './file'
 import { toOneTensor } from './tensor'
 import { ImageModelSpec } from './image-model'
-import {
-  attachClassNames,
-  checkClassNames,
-  getClassCount,
-  ModelArtifactsWithClassNames,
-  SaveResult,
-} from './classifier-utils'
-import { imageSharpToTensor } from './image-utils'
+import { getClassCount } from './classifier-utils'
 import {
   filterSpatialNodesWithUniqueShapes,
   getSpatialNodes,
 } from './spatial-utils'
+import { ImageEmbeddingOptions } from './model-utils'
+import {
+  ModelArtifacts,
+  ModelJSON,
+  SaveResult,
+} from '@tensorflow/tfjs-core/dist/io/types'
+import {
+  attachClassNames,
+  checkClassNames,
+  patchLoadedModelJSON,
+  SavedModelJSON,
+} from './internal'
 export { ImageModelSpec, PreTrainedImageModels } from './image-model'
 
 export type Model = tf.GraphModel | tf.LayersModel
@@ -35,22 +41,33 @@ export async function saveModel(options: {
 }): Promise<SaveResult> {
   let { dir, model, classNames } = options
   return await model.save({
-    async save(modelArtifact: ModelArtifactsWithClassNames) {
+    async save(modelArtifact: ModelArtifacts) {
+      await mkdir(dir, { recursive: true })
+      let modelJSON = modelArtifact as ModelJSON
+      if (
+        modelArtifact.weightData &&
+        modelArtifact.weightSpecs &&
+        !('weightsManifest' in modelArtifact)
+      ) {
+        let { weightData, weightSpecs, ...rest } = modelArtifact
+        modelJSON = rest as ModelJSON
+        modelJSON.weightsManifest = [{ paths: [], weights: weightSpecs }]
+        if (!Array.isArray(weightData)) {
+          weightData = [weightData]
+        }
+        for (let i = 0; i < weightData.length; i++) {
+          let filename = `group1-shard${i + 1}of${weightData.length}.bin`
+          modelJSON.weightsManifest[0].paths.push(filename)
+          let file = join(dir, filename)
+          await writeFile(file, Buffer.from(weightData[i]))
+        }
+      }
       if (classNames) {
-        modelArtifact.classNames = classNames
+        modelJSON.userDefinedMetadata ||= {}
+        modelJSON.userDefinedMetadata.classNames = classNames
       }
-      let weights = modelArtifact.weightData
-      if (!weights) {
-        throw new Error('missing weightData')
-      }
-      if (!Array.isArray(weights)) {
-        weights = [weights]
-      }
-      mkdirSync(dir, { recursive: true })
-      writeFile(join(dir, 'model.json'), JSON.stringify(modelArtifact))
-      for (let i = 0; i < weights.length; i++) {
-        writeFile(join(dir, `weight-${i}.bin`), Buffer.from(weights[i]))
-      }
+      await writeFile(join(dir, 'model.json'), JSON.stringify(modelJSON))
+
       return {
         modelArtifactsInfo: {
           dateSaved: new Date(),
@@ -66,26 +83,14 @@ export async function loadGraphModel(options: {
   classNames?: string[]
 }) {
   let { dir, classNames } = options
-  let model = await tf.loadGraphModel({
-    async load() {
-      let buffer = await readFile(join(dir, 'model.json'))
-      let modelArtifact: ModelArtifactsWithClassNames = JSON.parse(
-        buffer.toString(),
-      )
-      classNames = checkClassNames(modelArtifact, classNames)
-      let weights = modelArtifact.weightData
-      if (!weights) {
-        throw new Error('missing weightData')
-      }
-      if (!Array.isArray(weights)) {
-        weights = [weights]
-      }
-      for (let i = 0; i < weights.length; i++) {
-        weights[i] = await loadWeightData(join(dir, `weight-${i}.bin`))
-      }
-      return modelArtifact
-    },
-  })
+  let buffer = await readFile(join(dir, 'model.json'))
+  let modelArtifact: SavedModelJSON = JSON.parse(buffer.toString())
+  let changed = patchLoadedModelJSON(modelArtifact)
+  classNames = checkClassNames(modelArtifact, classNames)
+  if (changed) {
+    await writeFile(join(dir, 'model.json'), JSON.stringify(modelArtifact))
+  }
+  let model = await tf.loadGraphModel('file://' + join(dir, 'model.json'))
   return attachClassNames(model, classNames)
 }
 
@@ -94,46 +99,23 @@ export async function loadLayersModel(options: {
   classNames?: string[]
 }) {
   let { dir, classNames } = options
-  let model = await tf.loadLayersModel({
-    async load() {
-      let buffer = await readFile(join(dir, 'model.json'))
-      let modelArtifact: ModelArtifactsWithClassNames = JSON.parse(
-        buffer.toString(),
-      )
-      classNames = checkClassNames(modelArtifact, classNames)
-      let weights = modelArtifact.weightData
-      if (!weights) {
-        throw new Error('missing weightData')
-      }
-      if (!Array.isArray(weights)) {
-        modelArtifact.weightData = await loadWeightData(
-          join(dir, `weight-0.bin`),
-        )
-        return modelArtifact
-      }
-      for (let i = 0; i < weights.length; i++) {
-        weights[i] = await loadWeightData(join(dir, `weight-${i}.bin`))
-      }
-      return modelArtifact
-    },
-  })
+  let buffer = await readFile(join(dir, 'model.json'))
+  let modelArtifact: SavedModelJSON = JSON.parse(buffer.toString())
+  let changed = patchLoadedModelJSON(modelArtifact)
+  classNames = checkClassNames(modelArtifact, classNames)
+  if (changed) {
+    await writeFile(join(dir, 'model.json'), JSON.stringify(modelArtifact))
+  }
+  let model = await tf.loadLayersModel('file://' + join(dir, 'model.json'))
   if (classNames) {
     let classCount = getClassCount(model.outputShape)
     if (classCount != classNames.length) {
       throw new Error(
-        'number of classes mismatch, expected: ' +
-          classNames.length +
-          ', got: ' +
-          classCount,
+        `number of classes mismatch, expected: ${classNames.length}, got: ${classCount}`,
       )
     }
   }
   return attachClassNames(model, classNames)
-}
-
-async function loadWeightData(file: string) {
-  let buffer = await readFile(file)
-  return new Uint8Array(buffer)
 }
 
 export async function cachedLoadGraphModel(options: {
@@ -212,18 +194,30 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     ? new Map()
     : null
 
-  function checkCache(file_or_filename: string): tf.Tensor | void {
+  function checkCache(
+    file_or_filename: string,
+    options?: ImageEmbeddingOptions,
+  ): tf.Tensor | void {
     if (!fileEmbeddingCache || !isContentHash(file_or_filename)) return
 
     let filename = basename(file_or_filename)
 
     let embedding = fileEmbeddingCache.get(filename)
-    if (embedding) return embedding
+    if (embedding) {
+      let shape = embedding.shape
+      if (options?.squeeze && shape.length > 1 && shape[0] == 1) {
+        let squeezed = tf.squeeze(embedding, [0])
+        embedding.dispose()
+        fileEmbeddingCache.set(filename, squeezed)
+        return squeezed
+      }
+      return embedding
+    }
 
     let values = typeof cache == 'object' ? cache.get(filename) : undefined
     if (!values) return
 
-    embedding = tf.tensor([values])
+    embedding = options?.squeeze ? tf.tensor(values) : tf.tensor([values])
     fileEmbeddingCache.set(filename, embedding)
 
     return embedding
@@ -242,9 +236,9 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
 
   async function imageFileToEmbedding(
     file: string,
-    options?: { expandAnimations?: boolean },
+    options?: ImageEmbeddingOptions,
   ): Promise<tf.Tensor> {
-    let embedding = checkCache(file)
+    let embedding = checkCache(file, options)
     if (embedding) return embedding
 
     try {
@@ -264,6 +258,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
 
   function imageTensorToEmbedding(
     imageTensor: tf.Tensor3D | tf.Tensor4D,
+    options?: ImageEmbeddingOptions,
   ): tf.Tensor {
     return tf.tidy(() => {
       imageTensor = cropAndResizeImageTensor({
@@ -272,8 +267,10 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
         height,
         aspectRatio,
       })
-      let outputs = model.predict(imageTensor)
-      let embedding = toOneTensor(outputs)
+      let embedding = model.predict(imageTensor) as tf.Tensor
+      if (options?.squeeze) {
+        embedding = tf.squeeze(embedding, [0])
+      }
       return embedding
     })
   }

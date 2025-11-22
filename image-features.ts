@@ -1,4 +1,4 @@
-import { Tensor } from '@tensorflow/tfjs'
+import { Tensor } from '@tensorflow/tfjs-core'
 import { ImageModel } from './model'
 import { getLastSpatialNodeName } from './spatial-utils'
 

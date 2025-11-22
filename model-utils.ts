@@ -90,3 +90,9 @@ export function injectHiddenLayers(options: {
     injectLayer()
   }
 }
+
+export type ImageEmbeddingOptions = {
+  expandAnimations?: boolean
+  /** default: false */
+  squeeze?: boolean
+}

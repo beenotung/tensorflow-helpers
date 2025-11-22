@@ -14,10 +14,28 @@ Helper functions to use tensorflow in nodejs/browser for transfer learning, imag
 - List varies pre-trained models (url, image dimension, embedding size)
 - Support both nodejs and browser environment
 - Support caching model and image embedding
+- CLI tool for downloading TensorFlow.js models from various sources
+- Interactive model topology visualization
+- Standard weightsManifest format support for better compatibility
 - Typescript support
 - Works with plain Javascript, Typescript is not mandatory
 
 [1]: The built-in `tf.loadGraphModel()` cannot load the model saved by `model.save()`
+
+## Model Artifacts Management
+
+Models now provide better access to their internal artifacts while maintaining backward compatibility:
+
+```typescript
+// The familiar classNames API still works (now uses getter/setter proxy)
+model.classNames = ['cat', 'dog', 'bird']
+
+// New: Direct access to model artifacts
+const artifacts = model.getArtifacts()
+
+// Access classNames through the artifacts (standard TensorFlow.js format)
+const classNames = artifacts.userDefinedMetadata?.classNames
+```
 
 ## Installation
 
@@ -27,9 +45,30 @@ npm install tensorflow-helpers
 
 You can also install `tensorflow-helpers` with [pnpm](https://pnpm.io/), [yarn](https://yarnpkg.com/), or [slnpm](https://github.com/beenotung/slnpm)
 
+## Development Scripts
+
+When working with the source code, the following scripts are available:
+
+```bash
+# Development
+npm run dev          # Watch mode for browser testing
+npm run dev:chart    # Watch mode for model visualization
+
+# Building
+npm run bundle       # Build browser test bundle
+npm run bundle:chart # Build chart visualization bundle
+npm run build        # Build the library for distribution
+
+# Testing
+npm run test         # TypeScript type checking
+npm run clean        # Clean build artifacts
+```
+
 ## Usage Example
 
 See [model.test.ts](./model.test.ts) and [classifier.test.ts](./classifier.test.ts) for complete examples.
+
+**Quick Start**: Use the CLI tool to download models: `npx download-tfjs-model <source> <output-dir>` (see [CLI Tool](#cli-tool) section for details).
 
 **Usage from browser**:
 
@@ -134,6 +173,32 @@ console.log('result:', topClass)
 // [print] result: { label: 'anime', confidence: 0.7991582155227661 }
 ```
 
+## Model Visualization (Local Development)
+
+Interactive model topology visualization for analyzing model structure and selecting feature extraction points:
+
+```bash
+# Start the visualization development server
+npm run dev:chart
+
+# Open chart.html in your browser to visualize model topology
+```
+
+**Note**: This feature is currently only available for local development due to CORS restrictions. A hosted version is not available at this time.
+
+**Main Purpose**:
+
+- **Model Topology Analysis**: Visualize the complete graph of model nodes and their connections
+- **Feature Selection**: Identify optimal nodes to tap into for extracting intermediate features (spatial features, embeddings, etc.)
+- **Shape Inspection**: See the tensor shapes at each node to understand data flow through the model
+
+**Features**:
+
+- Interactive node exploration with hover and click-to-lock functionality
+- Visual connections showing data flow between layers
+- Node details including operation type and tensor shapes
+- Support for various model formats (GraphModel, LayersModel)
+
 ## Typescript Signature
 
 Details see the type hints from IDE.
@@ -207,6 +272,25 @@ export function cachedLoadLayersModel(options: {
   url: string
   dir: string
 }): Promise<Model>
+
+// Model artifacts management
+export function getModelArtifacts<Model extends object>(
+  model: Model,
+): PatchedModelArtifacts
+
+export function exposeModelArtifacts<Model extends object>(
+  model: Model,
+): Model & {
+  getArtifacts: () => PatchedModelArtifacts
+  classNames?: string[]
+}
+
+export type PatchedModelArtifacts = ModelJSON &
+  Pick<ModelArtifacts, 'weightData' | 'weightSpecs'> & {
+    userDefinedMetadata?: {
+      classNames?: string[]
+    }
+  }
 
 export function loadImageModel(options: {
   spec: ImageModelSpec
@@ -492,6 +576,36 @@ export function hashContent(
 /** @returns new filename with content hash and extname */
 export async function renameFileByContentHash(file: string): Promise<string>
 ```
+
+</details>
+
+<details>
+<summary>CLI Tool</summary>
+
+The package includes a command-line tool for downloading and converting TensorFlow.js models:
+
+```bash
+# Usage
+npx download-tfjs-model <source> <output-dir>
+
+# Examples
+npx download-tfjs-model https://www.kaggle.com/models/google/mobilenet-v3/TfJs/large-100-224-feature-vector/1 ./browser-models/mobilenet-v3-large-100
+npx download-tfjs-model ./hub-models/mobilenet-v2-035-128-feature-vector ./browser-models/mobilenet-v2-035
+```
+
+**Supported sources:**
+
+- TensorFlow Hub URLs
+- Kaggle model URLs
+- Local model directories
+- Local model.json files
+
+**Features:**
+
+- Automatic model format detection (GraphModel vs LayersModel)
+- Standard weightsManifest format conversion
+- Source metadata preservation
+- Recursive directory creation
 
 </details>
 

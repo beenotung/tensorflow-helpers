@@ -1,15 +1,16 @@
 import { ImageModel, loadLayersModel, saveModel } from './model'
 import * as tf from '@tensorflow/tfjs'
-import { existsSync } from 'fs'
+import { existsSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
-import { disposeTensor, toOneTensor } from './tensor'
 import { ClassWeight, ClassWeightMap } from '@tensorflow/tfjs'
 import { startTimer } from '@beenotung/tslib/timer'
 import { getDirFilenames, getDirFilenamesSync } from '@beenotung/tslib/fs'
 import {
+  ClassificationOptions,
   ClassificationResult,
   calcClassWeight,
   createImageClassifier,
+  getClassCount,
   mapWithClassName,
 } from './classifier-utils'
 export * from './classifier-utils'
@@ -28,10 +29,6 @@ export async function loadImageClassifierModel(options: {
 }) {
   let { baseModel, datasetDir, modelDir, classNames } = options
 
-  if (!classNames && existsSync(datasetDir)) {
-    classNames = getDirFilenamesSync(datasetDir)
-  }
-
   let classifierModel = existsSync(modelDir)
     ? await loadLayersModel({ dir: modelDir, classNames })
     : createImageClassifier({
@@ -39,19 +36,27 @@ export async function loadImageClassifierModel(options: {
         hiddenLayers: options.hiddenLayers,
         get classes() {
           if (!classNames) {
-            throw new Error('classNames not provided')
+            return getClassesFromDatasetDir(datasetDir).length
           }
           return classNames.length
         },
         classNames,
       })
-  classNames = classifierModel.classNames
+  classNames = classifierModel.classNames || classNames
+  if (!classNames && existsSync(datasetDir)) {
+    classNames = getClassesFromDatasetDir(datasetDir)
+  }
   if (!classNames) {
     throw new Error('classNames not provided')
   }
-  let classCount = classNames.length
-  if (classCount < 2) {
+  if (classNames.length < 2) {
     throw new Error('expect at least 2 classes')
+  }
+  let classCount = getClassCount(classifierModel.outputShape)
+  if (classNames.length !== classCount) {
+    throw new Error(
+      `classNames length mismatch: given ${classNames.length} classes, but the model has ${classCount} outputs`,
+    )
   }
 
   let compiled = false
@@ -60,35 +65,49 @@ export async function loadImageClassifierModel(options: {
     compiled = true
     classifierModel.compile({
       optimizer: 'adam',
-      loss: tf.metrics.categoricalCrossentropy,
+      loss: tf.losses.softmaxCrossEntropy,
       metrics: [tf.metrics.categoricalAccuracy],
     })
   }
 
   async function classifyImageFile(
     file: string,
+    options?: ClassificationOptions,
   ): Promise<ClassificationResult[]> {
     let embedding = await baseModel.imageFileToEmbedding(file)
     /* do not dispose embedding because it may be cached */
-    return classifyImageEmbedding(embedding)
+    return classifyImageEmbedding(embedding, options)
   }
 
   async function classifyImageTensor(
     imageTensor: tf.Tensor3D | tf.Tensor4D,
+    options?: ClassificationOptions,
   ): Promise<ClassificationResult[]> {
     let embedding = baseModel.imageTensorToEmbedding(imageTensor)
-    let results = await classifyImageEmbedding(embedding)
+    let results = await classifyImageEmbedding(embedding, options)
     embedding.dispose()
     return results
   }
 
-  async function classifyImageEmbedding(embedding: tf.Tensor) {
+  async function classifyImageEmbedding(
+    embedding: tf.Tensor,
+    options?: ClassificationOptions,
+  ) {
     let outputs = tf.tidy(() => {
-      let outputs = classifierModel.predict(embedding)
-      return toOneTensor(outputs)
+      if (embedding.rank === 1) {
+        embedding = tf.expandDims(embedding, 0)
+      }
+      let y = classifierModel.predict(embedding) as tf.Tensor
+      if (options?.squeeze) {
+        y = tf.squeeze(y, [0])
+      }
+      if (options?.applySoftmax !== false) {
+        y = tf.softmax(y)
+      }
+      return y
     })
     let values = await outputs.data()
-    disposeTensor(outputs)
+    outputs.dispose()
     return mapWithClassName(classNames!, values)
   }
 
@@ -98,40 +117,54 @@ export async function loadImageClassifierModel(options: {
     let classCounts: number[] = new Array(classCount).fill(0)
 
     let total = 0
-    let classes = await Promise.all(
-      classNames!.map(async (className, classIdx) => {
-        let dir = join(datasetDir, className)
-        let filenames = await getDirFilenames(dir)
-        total += filenames.length
-        return { classIdx, dir, filenames }
-      }),
-    )
+    let classes = []
+    let timer = startTimer('scan dataset')
+    timer.setEstimateProgress(classNames!.length)
+    for (let i = 0; i < classNames!.length; i++) {
+      let className = classNames![i]
+      let dir = join(datasetDir, className)
+      let filenames = await getDirFilenames(dir)
+      total += filenames.length
+      classes.push({
+        classIdx: i,
+        dir,
+        filenames,
+      })
+      timer.tick()
+    }
 
-    let timer = startTimer('load dataset')
+    timer.next('load dataset')
     timer.setEstimateProgress(total)
     for (let { classIdx, dir, filenames } of classes) {
       for (let filename of filenames) {
         let file = join(dir, filename)
-        let embedding = await baseModel.imageFileToEmbedding(file)
+        let embedding = await baseModel.imageFileToEmbedding(file, {
+          squeeze: true,
+        })
         xs.push(embedding)
         classIndices.push(classIdx)
         classCounts[classIdx]++
         timer.tick()
       }
     }
-    timer.end()
 
-    let x = tf.concat(xs)
+    timer.next('stack embeddings')
+    let x = tf.stack(xs)
 
     if (!baseModel.fileEmbeddingCache) {
+      timer.next('dispose individual embeddings')
+      timer.setEstimateProgress(xs.length)
       for (let x of xs) {
         x.dispose()
+        timer.tick()
       }
     }
 
+    timer.next('prepare one-hot labels')
     let y = tf.tidy(() =>
       tf.oneHot(tf.tensor1d(classIndices, 'int32'), classCount),
     )
+    timer.end()
 
     return { x, y, classCounts }
   }
@@ -210,4 +243,18 @@ export async function loadImageClassifierModel(options: {
     train,
     save,
   }
+}
+
+export function getClassesFromDatasetDir(datasetDir: string) {
+  if (!existsSync(datasetDir)) {
+    throw new Error('datasetDir not exists')
+  }
+  let classNames = getDirFilenamesSync(datasetDir).filter(filename => {
+    let file = join(datasetDir, filename)
+    return statSync(file).isDirectory()
+  })
+  if (classNames.length === 0) {
+    throw new Error('no image folders found in datasetDir')
+  }
+  return classNames
 }
