@@ -327,6 +327,44 @@
             >(Lower = favor worst images more, Higher = more random)</span
           >
         </div>
+        <div
+          style="
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          "
+        >
+          <label for="learningRateInput">Learning Rate:</label>
+          <input
+            type="number"
+            id="learningRateInput"
+            min="1e-6"
+            max="1e-2"
+            step="1e-5"
+            value="0.0001"
+            style="width: 80px; padding: 4px"
+          />
+          <span style="font-size: 12px; color: #7f8c8d"
+            >(Higher = faster but less stable)</span
+          >
+        </div>
+        <div
+          style="
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          "
+        >
+          <label for="selectionStrategy">Selection Strategy:</label>
+          <select id="selectionStrategy" style="padding: 4px">
+            <option value="weighted">Weighted Random (Current)</option>
+            <option value="hard-mining">Hard Negative Mining</option>
+            <option value="diverse">Diverse Batch (Mix of difficulties)</option>
+            <option value="curriculum">Curriculum Learning</option>
+          </select>
+        </div>
         <div class="status" id="status">Please select images to begin</div>
       </div>
 
@@ -379,7 +417,7 @@
 
       const IMAGE_SIZE = 224
       const NUM_CLASSES = 2 // background + 1 object class
-      const LEARNING_RATE = 1e-4
+      let currentLearningRate = 1e-4
 
       // UI elements
       const imageInput = document.getElementById('imageInput')
@@ -388,6 +426,9 @@
       const drawBoxBtn = document.getElementById('drawBoxBtn')
       const batchSizeInput = document.getElementById('batchSizeInput')
       const temperatureInput = document.getElementById('temperatureInput')
+      const learningRateInput = document.getElementById('learningRateInput')
+      const selectionStrategySelect =
+        document.getElementById('selectionStrategy')
       const imageCounter = document.getElementById('imageCounter')
       const statusDiv = document.getElementById('status')
       const imagesGrid = document.getElementById('imagesGrid')
@@ -574,57 +615,107 @@
         const isGraphModel = featureExtractor && 'execute' in featureExtractor
 
         if (isGraphModel) {
-          // For GraphModel, build a simple detection head that takes features as input
+          // For GraphModel, build a detection head with intermediate layers for better learning
           // Features will be extracted separately in the training loop
           const featureInput = tf.input({ shape: [1280] }) // Feature vector size
 
-          // Bounding box head
+          // Shared intermediate layer for better feature learning
+          const shared = tf.layers
+            .dense({
+              units: 256,
+              activation: 'relu',
+              name: 'shared_layer',
+            })
+            .apply(featureInput)
+
+          // Bounding box head with intermediate layer
+          const boxIntermediate = tf.layers
+            .dense({
+              units: 128,
+              activation: 'relu',
+              name: 'box_intermediate',
+            })
+            .apply(shared)
+
           const boxHead = tf.layers
             .dense({
               units: 4,
               activation: 'sigmoid',
               name: 'box_head',
             })
-            .apply(featureInput)
+            .apply(boxIntermediate)
 
-          // Classification head
+          // Classification head with intermediate layer
+          const classIntermediate = tf.layers
+            .dense({
+              units: 128,
+              activation: 'relu',
+              name: 'class_intermediate',
+            })
+            .apply(shared)
+
           const classHead = tf.layers
             .dense({
               units: NUM_CLASSES,
               activation: 'softmax',
               name: 'class_head',
             })
-            .apply(featureInput)
+            .apply(classIntermediate)
 
           detectionModel = tf.model({
             inputs: featureInput,
             outputs: [boxHead, classHead],
           })
         } else {
-          // For LayersModel, use the original approach
+          // For LayersModel, use the original approach with improved architecture
           const input = tf.input({ shape: [IMAGE_SIZE, IMAGE_SIZE, 3] })
           const features = featureExtractor.apply(input)
 
           // Flatten if needed
           const flattened = tf.layers.flatten().apply(features)
 
-          // Bounding box head
+          // Shared intermediate layer for better feature learning
+          const shared = tf.layers
+            .dense({
+              units: 256,
+              activation: 'relu',
+              name: 'shared_layer',
+            })
+            .apply(flattened)
+
+          // Bounding box head with intermediate layer
+          const boxIntermediate = tf.layers
+            .dense({
+              units: 128,
+              activation: 'relu',
+              name: 'box_intermediate',
+            })
+            .apply(shared)
+
           const boxHead = tf.layers
             .dense({
               units: 4,
               activation: 'sigmoid',
               name: 'box_head',
             })
-            .apply(flattened)
+            .apply(boxIntermediate)
 
-          // Classification head
+          // Classification head with intermediate layer
+          const classIntermediate = tf.layers
+            .dense({
+              units: 128,
+              activation: 'relu',
+              name: 'class_intermediate',
+            })
+            .apply(shared)
+
           const classHead = tf.layers
             .dense({
               units: NUM_CLASSES,
               activation: 'softmax',
               name: 'class_head',
             })
-            .apply(flattened)
+            .apply(classIntermediate)
 
           detectionModel = tf.model({
             inputs: input,
@@ -632,17 +723,25 @@
           })
         }
 
-        // Compile model
-        const optimizer = tf.train.adam(LEARNING_RATE)
+        // Compile model with initial learning rate
+        updateModelLearningRate(currentLearningRate)
+
+        log('Detection model built and compiled', 'success')
+        log(`Model summary: ${detectionModel.countParams()} parameters`, 'info')
+      }
+
+      // Update model learning rate dynamically
+      function updateModelLearningRate(lr) {
+        if (!detectionModel) return
+        currentLearningRate = lr
+        const optimizer = tf.train.adam(lr)
         detectionModel.compile({
           optimizer: optimizer,
           loss: ['meanSquaredError', 'categoricalCrossentropy'],
           lossWeights: [1.0, 0.5], // Weight box loss more
           metrics: ['accuracy'],
         })
-
-        log('Detection model built and compiled', 'success')
-        log(`Model summary: ${detectionModel.countParams()} parameters`, 'info')
+        log(`Learning rate updated to ${lr}`, 'info')
       }
 
       // Load a single image into dataset
@@ -1014,7 +1113,74 @@
         }
       }
 
-      // Select images using weighted random selection based on cached losses
+      // Hard negative mining: select hardest examples
+      function hardNegativeMining(losses, batchSize) {
+        // Sort by loss (worst first) and take top N
+        const sorted = [...losses].sort((a, b) => b.totalLoss - a.totalLoss)
+        return sorted.slice(0, batchSize).map(l => l.index)
+      }
+
+      // Diverse batch: mix of high, medium, and low loss images
+      function diverseBatchSelection(losses, batchSize) {
+        const sorted = [...losses].sort((a, b) => b.totalLoss - a.totalLoss)
+        const selected = []
+        const third = Math.floor(batchSize / 3)
+
+        // Take worst third
+        for (let i = 0; i < third && i < sorted.length; i++) {
+          selected.push(sorted[i].index)
+        }
+
+        // Take middle third
+        const midStart = Math.floor(sorted.length / 3)
+        for (let i = 0; i < third && midStart + i < sorted.length; i++) {
+          if (!selected.includes(sorted[midStart + i].index)) {
+            selected.push(sorted[midStart + i].index)
+          }
+        }
+
+        // Take best third (or random if we need more)
+        const remaining = batchSize - selected.length
+        for (let i = 0; i < remaining; i++) {
+          const randomIdx = Math.floor(Math.random() * sorted.length)
+          if (!selected.includes(sorted[randomIdx].index)) {
+            selected.push(sorted[randomIdx].index)
+          }
+        }
+
+        return selected.slice(0, batchSize)
+      }
+
+      // Curriculum learning: gradually increase difficulty
+      function curriculumLearning(losses, batchSize, epoch) {
+        // Start with easier examples, gradually include harder ones
+        const sorted = [...losses].sort((a, b) => b.totalLoss - a.totalLoss)
+        const progress = Math.min(epoch / 50, 1.0) // Full curriculum over 50 epochs
+        const hardRatio = progress // More hard examples as training progresses
+
+        const hardCount = Math.floor(batchSize * hardRatio)
+        const easyCount = batchSize - hardCount
+
+        const selected = []
+        // Add hardest examples
+        for (let i = 0; i < hardCount && i < sorted.length; i++) {
+          selected.push(sorted[i].index)
+        }
+        // Add easier examples
+        for (
+          let i = sorted.length - 1;
+          i >= sorted.length - easyCount && i >= 0;
+          i--
+        ) {
+          if (!selected.includes(sorted[i].index)) {
+            selected.push(sorted[i].index)
+          }
+        }
+
+        return selected.slice(0, batchSize)
+      }
+
+      // Select images using different strategies based on cached losses
       function selectImagesForTraining(batchSize, temperature) {
         // Build losses array from cached values
         const losses = []
@@ -1035,12 +1201,32 @@
         // Get batch size (ensure it doesn't exceed number of images)
         const actualBatchSize = Math.min(batchSize, imageDataset.length)
 
-        // Select images using weighted random selection
-        const selectedIndices = weightedRandomSelect(
-          losses,
-          actualBatchSize,
-          temperature,
-        )
+        // Select based on strategy
+        const strategy = selectionStrategySelect.value
+        let selectedIndices
+
+        switch (strategy) {
+          case 'hard-mining':
+            selectedIndices = hardNegativeMining(losses, actualBatchSize)
+            break
+          case 'diverse':
+            selectedIndices = diverseBatchSelection(losses, actualBatchSize)
+            break
+          case 'curriculum':
+            selectedIndices = curriculumLearning(
+              losses,
+              actualBatchSize,
+              currentEpoch,
+            )
+            break
+          case 'weighted':
+          default:
+            selectedIndices = weightedRandomSelect(
+              losses,
+              actualBatchSize,
+              temperature,
+            )
+        }
 
         // Assign rankings and update displays
         losses.forEach((loss, rank) => {
@@ -1058,9 +1244,18 @@
         if (!isTraining || !detectionModel || imageDataset.length === 0) return
 
         try {
-          // Get batch size and temperature from inputs
+          // Get batch size, temperature, and learning rate from inputs
           const batchSize = parseInt(batchSizeInput.value) || 1
           const temperature = parseFloat(temperatureInput.value) || 2.0
+          const newLearningRate = parseFloat(learningRateInput.value) || 1e-4
+
+          // Update learning rate if changed (with learning rate decay)
+          const decayFactor = 0.999 // Small decay per epoch
+          const adjustedLR =
+            newLearningRate * Math.pow(decayFactor, currentEpoch)
+          if (Math.abs(adjustedLR - currentLearningRate) > 1e-7) {
+            updateModelLearningRate(adjustedLR)
+          }
 
           // On first epoch, train on all images to collect initial losses
           let selectedIndices
@@ -1071,7 +1266,7 @@
             actualBatchSize = imageDataset.length
             statusDiv.textContent = `Initializing: training on all ${imageDataset.length} images to collect losses...`
           } else {
-            // Subsequent epochs: select based on cached losses
+            // Subsequent epochs: select based on cached losses and strategy
             actualBatchSize = Math.min(batchSize, imageDataset.length)
             selectedIndices = selectImagesForTraining(
               actualBatchSize,
@@ -1146,11 +1341,20 @@
           document.getElementById('classLossValue').textContent =
             avgClassLoss.toFixed(4)
 
-          // Update status
+          // Update status with strategy info
+          const strategy = selectionStrategySelect.value
+          const strategyName =
+            {
+              'weighted': 'Weighted Random',
+              'hard-mining': 'Hard Mining',
+              'diverse': 'Diverse Batch',
+              'curriculum': 'Curriculum',
+            }[strategy] || 'Weighted'
+
           if (currentEpoch === 1) {
-            statusDiv.textContent = `Initialization complete. Starting weighted training (Epoch: ${currentEpoch}, Avg Loss: ${avgTotalLoss.toFixed(4)})`
+            statusDiv.textContent = `Initialization complete. Using ${strategyName} (Epoch: ${currentEpoch}, LR: ${currentLearningRate.toFixed(6)}, Loss: ${avgTotalLoss.toFixed(4)})`
           } else {
-            statusDiv.textContent = `Trained on ${actualBatchSize} image(s) (Epoch: ${currentEpoch}, Avg Loss: ${avgTotalLoss.toFixed(4)})`
+            statusDiv.textContent = `${strategyName}: ${actualBatchSize} image(s) (Epoch: ${currentEpoch}, LR: ${currentLearningRate.toFixed(6)}, Loss: ${avgTotalLoss.toFixed(4)})`
           }
 
           // Update rankings based on newly collected losses (only if not first epoch)
@@ -1284,6 +1488,8 @@
         drawBoxBtn.disabled = imageDataset.length === 0
         batchSizeInput.disabled = false
         temperatureInput.disabled = false
+        learningRateInput.disabled = false
+        selectionStrategySelect.disabled = false
         statusDiv.textContent = `Training stopped. Processed ${currentEpoch} epochs across ${imageDataset.length} image(s).`
         log('Training stopped', 'info')
       }
