@@ -149,6 +149,48 @@
         line-height: 1.4;
       }
 
+      .image-item .image-loss {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #7f8c8d;
+        padding: 4px 8px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        display: inline-block;
+      }
+
+      .image-item .image-loss.high {
+        color: #e74c3c;
+        background: #fee;
+      }
+
+      .image-item .image-loss.medium {
+        color: #f39c12;
+        background: #fef5e7;
+      }
+
+      .image-item .image-loss.low {
+        color: #2ecc71;
+        background: #eafaf1;
+      }
+
+      .image-item .image-ranking {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: rgba(52, 152, 219, 0.9);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+        z-index: 10;
+      }
+
+      .image-item .image-ranking.worst {
+        background: rgba(231, 76, 60, 0.9);
+      }
+
       .image-item canvas {
         display: block;
         max-width: 100%;
@@ -242,6 +284,49 @@
             >0 images loaded</span
           >
         </div>
+        <div
+          style="
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          "
+        >
+          <label for="batchSizeInput">Batch Size (worst images):</label>
+          <input
+            type="number"
+            id="batchSizeInput"
+            min="1"
+            max="1"
+            value="1"
+            style="width: 60px; padding: 4px"
+          />
+          <span style="font-size: 12px; color: #7f8c8d"
+            >(Number of images to train on per epoch)</span
+          >
+        </div>
+        <div
+          style="
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          "
+        >
+          <label for="temperatureInput">Selection Temperature:</label>
+          <input
+            type="number"
+            id="temperatureInput"
+            min="0.1"
+            max="10"
+            step="0.1"
+            value="2.0"
+            style="width: 60px; padding: 4px"
+          />
+          <span style="font-size: 12px; color: #7f8c8d"
+            >(Lower = favor worst images more, Higher = more random)</span
+          >
+        </div>
         <div class="status" id="status">Please select images to begin</div>
       </div>
 
@@ -282,7 +367,7 @@
       let currentImageFileName = null
 
       // Multiple images support
-      let imageDataset = [] // Array of {file, name, element, tensor, box, class}
+      let imageDataset = [] // Array of {file, name, element, tensor, box, class, boxLoss, totalLoss, rank}
       let currentImageIndex = 0
       let currentTrainingImageIndex = 0
 
@@ -301,6 +386,8 @@
       const startBtn = document.getElementById('startTrainingBtn')
       const stopBtn = document.getElementById('stopTrainingBtn')
       const drawBoxBtn = document.getElementById('drawBoxBtn')
+      const batchSizeInput = document.getElementById('batchSizeInput')
+      const temperatureInput = document.getElementById('temperatureInput')
       const imageCounter = document.getElementById('imageCounter')
       const statusDiv = document.getElementById('status')
       const imagesGrid = document.getElementById('imagesGrid')
@@ -637,10 +724,23 @@
           nameDiv.textContent = imgData.name
           imageItem.appendChild(nameDiv)
 
+          // Loss display
+          const lossDiv = document.createElement('div')
+          lossDiv.className = 'image-loss'
+          lossDiv.textContent = 'Box Loss: -'
+          imageItem.appendChild(lossDiv)
+
           // Canvas container
           const canvasContainer = document.createElement('div')
           canvasContainer.className = 'canvas-container'
           canvasContainer.dataset.index = index
+          canvasContainer.style.position = 'relative'
+
+          // Ranking badge
+          const rankingBadge = document.createElement('div')
+          rankingBadge.className = 'image-ranking'
+          rankingBadge.textContent = 'Rank -'
+          canvasContainer.appendChild(rankingBadge)
 
           // Create canvases
           const imageCanvas = document.createElement('canvas')
@@ -668,6 +768,8 @@
             predCanvas,
             container: canvasContainer,
             item: imageItem,
+            lossElement: lossDiv,
+            rankingElement: rankingBadge,
           }
 
           canvasContainer.appendChild(imageCanvas)
@@ -753,6 +855,13 @@
           currentImageIndex = 0
           displayAllImages()
 
+          // Update batch size input max and ensure it's enabled
+          batchSizeInput.max = files.length
+          batchSizeInput.disabled = false
+          if (parseInt(batchSizeInput.value) > files.length) {
+            batchSizeInput.value = files.length
+          }
+
           log(`All ${files.length} images loaded successfully`, 'success')
         } catch (error) {
           log(`Error loading images: ${error.message}`, 'error')
@@ -760,73 +869,299 @@
         }
       })
 
-      // Training loop - cycles through all images
+      // Calculate loss for a single image
+      async function calculateImageLoss(imgData) {
+        const isGraphModel = featureExtractor && 'execute' in featureExtractor
+        let xs, ys
+
+        if (isGraphModel) {
+          const features = featureExtractor.execute(
+            { 'inputs:0': imgData.tensor },
+            'Identity:0',
+          )
+          xs = features
+          ys = [imgData.box, imgData.class]
+        } else {
+          xs = imgData.tensor
+          ys = [imgData.box, imgData.class]
+        }
+
+        // Get predictions
+        const [predBoxes, predClasses] = detectionModel.predict(xs)
+
+        // Calculate box loss (MSE)
+        const boxLoss = tf.losses.meanSquaredError(imgData.box, predBoxes)
+        const boxLossValue = await boxLoss.data()
+
+        // Calculate class loss (categorical crossentropy)
+        const classLoss = tf.losses.softmaxCrossEntropy(
+          imgData.class,
+          predClasses,
+        )
+        const classLossValue = await classLoss.data()
+
+        const totalLoss = boxLossValue[0] + classLossValue[0] * 0.5
+
+        // Store losses in image data
+        imgData.boxLoss = boxLossValue[0]
+        imgData.classLoss = classLossValue[0]
+        imgData.totalLoss = totalLoss
+
+        // Cleanup
+        if (isGraphModel && xs !== imgData.tensor) {
+          xs.dispose()
+        }
+        predBoxes.dispose()
+        predClasses.dispose()
+        boxLoss.dispose()
+        classLoss.dispose()
+
+        return {
+          totalLoss,
+          boxLoss: boxLossValue[0],
+          classLoss: classLossValue[0],
+        }
+      }
+
+      // Weighted random selection based on loss (higher loss = higher probability)
+      function weightedRandomSelect(losses, batchSize, temperature) {
+        // Calculate probabilities using softmax with temperature
+        // Higher loss = higher probability, but temperature controls sharpness
+        const maxLoss = Math.max(...losses.map(l => l.totalLoss))
+        const minLoss = Math.min(...losses.map(l => l.totalLoss))
+        const lossRange = maxLoss - minLoss || 1 // Avoid division by zero
+
+        // Normalize losses and apply temperature
+        const weights = losses.map(loss => {
+          // Normalize loss to [0, 1] range
+          const normalized = (loss.totalLoss - minLoss) / lossRange
+          // Apply temperature: lower temperature = sharper distribution (favors worst more)
+          // Using exponential to make higher losses much more likely
+          return Math.exp(normalized / temperature)
+        })
+
+        // Calculate probabilities
+        const sumWeights = weights.reduce((a, b) => a + b, 0)
+        const probabilities = weights.map(w => w / sumWeights)
+
+        // Sample without replacement
+        const selectedIndices = []
+        const availableIndices = losses.map((_, i) => i)
+        const availableProbs = [...probabilities]
+
+        for (let i = 0; i < batchSize && availableIndices.length > 0; i++) {
+          // Select one index based on probabilities
+          const rand = Math.random()
+          let cumulative = 0
+          let selectedIdx = -1
+
+          for (let j = 0; j < availableProbs.length; j++) {
+            cumulative += availableProbs[j]
+            if (rand <= cumulative) {
+              selectedIdx = j
+              break
+            }
+          }
+
+          // Fallback to last index if needed
+          if (selectedIdx === -1) selectedIdx = availableProbs.length - 1
+
+          const actualIndex = losses[availableIndices[selectedIdx]].index
+          selectedIndices.push(actualIndex)
+
+          // Remove selected index and renormalize probabilities
+          availableIndices.splice(selectedIdx, 1)
+          availableProbs.splice(selectedIdx, 1)
+          const newSum = availableProbs.reduce((a, b) => a + b, 0)
+          for (let j = 0; j < availableProbs.length; j++) {
+            availableProbs[j] /= newSum
+          }
+        }
+
+        return selectedIndices
+      }
+
+      // Update loss display for a specific image
+      function updateImageLossDisplay(index, boxLoss, rank, isWorst) {
+        if (index < 0 || index >= imageDataset.length) return
+        const imgData = imageDataset[index]
+        if (!imgData.canvasElements) return
+
+        // Update loss text
+        const lossElement = imgData.canvasElements.lossElement
+        if (lossElement) {
+          lossElement.textContent = `Box Loss: ${boxLoss.toFixed(4)}`
+          // Color code based on loss value
+          lossElement.className = 'image-loss'
+          if (boxLoss > 0.1) {
+            lossElement.classList.add('high')
+          } else if (boxLoss > 0.05) {
+            lossElement.classList.add('medium')
+          } else {
+            lossElement.classList.add('low')
+          }
+        }
+
+        // Update ranking badge
+        const rankingElement = imgData.canvasElements.rankingElement
+        if (rankingElement) {
+          rankingElement.textContent = `Rank ${rank}`
+          rankingElement.className = 'image-ranking'
+          if (isWorst) {
+            rankingElement.classList.add('worst')
+            rankingElement.textContent = `Rank ${rank} (Batch)`
+          }
+        }
+      }
+
+      // Select images using weighted random selection based on cached losses
+      function selectImagesForTraining(batchSize, temperature) {
+        // Build losses array from cached values
+        const losses = []
+        for (let i = 0; i < imageDataset.length; i++) {
+          const imgData = imageDataset[i]
+          // Use cached loss, or default to high value if not calculated yet
+          losses.push({
+            index: i,
+            totalLoss: imgData.totalLoss ?? 1.0,
+            boxLoss: imgData.boxLoss ?? 1.0,
+            classLoss: imgData.classLoss ?? 0.0,
+          })
+        }
+
+        // Sort by total loss (descending - worst first) for ranking display
+        losses.sort((a, b) => b.totalLoss - a.totalLoss)
+
+        // Get batch size (ensure it doesn't exceed number of images)
+        const actualBatchSize = Math.min(batchSize, imageDataset.length)
+
+        // Select images using weighted random selection
+        const selectedIndices = weightedRandomSelect(
+          losses,
+          actualBatchSize,
+          temperature,
+        )
+
+        // Assign rankings and update displays
+        losses.forEach((loss, rank) => {
+          const imgData = imageDataset[loss.index]
+          imgData.rank = rank + 1 // 1-based ranking
+          const isInBatch = selectedIndices.includes(loss.index)
+          updateImageLossDisplay(loss.index, loss.boxLoss, rank + 1, isInBatch)
+        })
+
+        return selectedIndices
+      }
+
+      // Training loop - trains on images one by one, collecting losses during training
       async function trainEpoch() {
         if (!isTraining || !detectionModel || imageDataset.length === 0) return
 
         try {
-          // Get current training image (cycle through dataset)
-          const imgData = imageDataset[currentTrainingImageIndex]
-          const trainTensor = imgData.tensor
-          const trainBox = imgData.box
-          const trainClass = imgData.class
+          // Get batch size and temperature from inputs
+          const batchSize = parseInt(batchSizeInput.value) || 1
+          const temperature = parseFloat(temperatureInput.value) || 2.0
 
-          const isGraphModel = featureExtractor && 'execute' in featureExtractor
-          let xs, ys
-
-          if (isGraphModel) {
-            // Extract features using GraphModel (frozen, no gradients)
-            const features = featureExtractor.execute(
-              { 'inputs:0': trainTensor },
-              'Identity:0',
-            )
-            xs = features
-            ys = [trainBox, trainClass]
+          // On first epoch, train on all images to collect initial losses
+          let selectedIndices
+          let actualBatchSize
+          if (currentEpoch === 0) {
+            // First epoch: train on all images to collect losses
+            selectedIndices = imageDataset.map((_, i) => i)
+            actualBatchSize = imageDataset.length
+            statusDiv.textContent = `Initializing: training on all ${imageDataset.length} images to collect losses...`
           } else {
-            // For LayersModel, use image directly
-            xs = trainTensor
-            ys = [trainBox, trainClass]
+            // Subsequent epochs: select based on cached losses
+            actualBatchSize = Math.min(batchSize, imageDataset.length)
+            selectedIndices = selectImagesForTraining(
+              actualBatchSize,
+              temperature,
+            )
           }
 
-          // Train for one epoch (1 batch)
-          const history = await detectionModel.fit(xs, ys, {
-            epochs: 1,
-            batchSize: 1,
-            verbose: 0,
-          })
+          const isGraphModel = featureExtractor && 'execute' in featureExtractor
+          let totalBoxLoss = 0
+          let totalClassLoss = 0
+          let totalLossSum = 0
+
+          // Train on each selected image one by one, collecting losses
+          for (const index of selectedIndices) {
+            const imgData = imageDataset[index]
+            let xs, ys
+
+            if (isGraphModel) {
+              // Extract features using GraphModel (frozen, no gradients)
+              const features = featureExtractor.execute(
+                { 'inputs:0': imgData.tensor },
+                'Identity:0',
+              )
+              xs = features
+              ys = [imgData.box, imgData.class]
+            } else {
+              // For LayersModel, use image directly
+              xs = imgData.tensor
+              ys = [imgData.box, imgData.class]
+            }
+
+            // Train on single image and collect loss
+            const history = await detectionModel.fit(xs, ys, {
+              epochs: 1,
+              batchSize: 1,
+              verbose: 0,
+            })
+
+            const boxLoss = history.history.loss[0]
+            const classLoss = history.history.loss[1] || 0
+            const totalLoss = boxLoss + classLoss
+
+            // Store the actual training loss for this image
+            imgData.totalLoss = totalLoss
+            imgData.boxLoss = boxLoss
+            imgData.classLoss = classLoss
+
+            // Accumulate for average display
+            totalBoxLoss += boxLoss
+            totalClassLoss += classLoss
+            totalLossSum += totalLoss
+
+            // Cleanup
+            if (isGraphModel && xs !== imgData.tensor) {
+              xs.dispose()
+            }
+          }
 
           currentEpoch++
 
+          // Calculate averages for display
+          const avgBoxLoss = totalBoxLoss / actualBatchSize
+          const avgClassLoss = totalClassLoss / actualBatchSize
+          const avgTotalLoss = totalLossSum / actualBatchSize
+
           // Update UI
           document.getElementById('epochValue').textContent = currentEpoch
-
-          const boxLoss = history.history.loss[0]
-          const classLoss = history.history.loss[1] || 0
-          const totalLoss = boxLoss + classLoss
-
           document.getElementById('lossValue').textContent =
-            totalLoss.toFixed(4)
+            avgTotalLoss.toFixed(4)
           document.getElementById('boxLossValue').textContent =
-            boxLoss.toFixed(4)
+            avgBoxLoss.toFixed(4)
           document.getElementById('classLossValue').textContent =
-            classLoss.toFixed(4)
+            avgClassLoss.toFixed(4)
 
-          // Update status to show which image is being trained
-          statusDiv.textContent = `Training on image ${currentTrainingImageIndex + 1}/${imageDataset.length}: ${imgData.name} (Epoch: ${currentEpoch})`
-
-          // Cleanup if GraphModel (features tensor)
-          if (isGraphModel && xs !== trainTensor) {
-            xs.dispose()
+          // Update status
+          if (currentEpoch === 1) {
+            statusDiv.textContent = `Initialization complete. Starting weighted training (Epoch: ${currentEpoch}, Avg Loss: ${avgTotalLoss.toFixed(4)})`
+          } else {
+            statusDiv.textContent = `Trained on ${actualBatchSize} image(s) (Epoch: ${currentEpoch}, Avg Loss: ${avgTotalLoss.toFixed(4)})`
           }
 
-          // Move to next image for next epoch
-          currentTrainingImageIndex =
-            (currentTrainingImageIndex + 1) % imageDataset.length
+          // Update rankings based on newly collected losses (only if not first epoch)
+          if (currentEpoch > 0) {
+            selectImagesForTraining(actualBatchSize, temperature)
+          }
 
           // Run inference and visualize on all images
           await visualizePredictions()
 
-          // Continue training - no delay needed since we cycle through multiple images
+          // Continue training
           if (isTraining) {
             trainEpoch()
           }
@@ -925,9 +1260,15 @@
         startBtn.disabled = true
         stopBtn.disabled = false
         drawBoxBtn.disabled = true
-        statusDiv.textContent = `Training started on ${imageDataset.length} image(s)...`
-        log(`Training started on ${imageDataset.length} image(s)`, 'success')
+        batchSizeInput.disabled = true
+        const batchSize = parseInt(batchSizeInput.value) || 1
+        statusDiv.textContent = `Training started on ${imageDataset.length} image(s) with batch size ${batchSize}. Calculating initial rankings...`
+        log(
+          `Training started on ${imageDataset.length} image(s) with batch size ${batchSize}`,
+          'success',
+        )
 
+        // Calculate initial rankings before starting training
         trainEpoch()
       })
 
@@ -941,6 +1282,8 @@
         startBtn.disabled = false
         stopBtn.disabled = true
         drawBoxBtn.disabled = imageDataset.length === 0
+        batchSizeInput.disabled = false
+        temperatureInput.disabled = false
         statusDiv.textContent = `Training stopped. Processed ${currentEpoch} epochs across ${imageDataset.length} image(s).`
         log('Training stopped', 'info')
       }
@@ -1092,6 +1435,8 @@
       // Initialize on page load
       window.addEventListener('load', async () => {
         log('Initializing...', 'info')
+        // Ensure batch size input is enabled
+        batchSizeInput.disabled = false
         initializeModel()
 
         // Check if Firefox has preserved file selections
