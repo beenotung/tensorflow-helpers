@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SSD Training Demo - Single Image</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+          Cantarell, sans-serif;
+        padding: 20px;
+        background: #f5f5f5;
+        color: #333;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      h1 {
+        margin-bottom: 10px;
+        color: #2c3e50;
+      }
+
+      .subtitle {
+        color: #7f8c8d;
+        margin-bottom: 30px;
+      }
+
+      .upload-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+      }
+
+      .file-input-wrapper {
+        margin-bottom: 15px;
+      }
+
+      input[type='file'] {
+        margin-bottom: 10px;
+      }
+
+      button {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-right: 10px;
+        transition: background 0.3s;
+      }
+
+      button:hover:not(:disabled) {
+        background: #2980b9;
+      }
+
+      button:disabled {
+        background: #bdc3c7;
+        cursor: not-allowed;
+      }
+
+      .status {
+        margin-top: 15px;
+        padding: 12px;
+        background: #e8f4f8;
+        border-left: 4px solid #3498db;
+        border-radius: 4px;
+      }
+
+      .training-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+      }
+
+      .info-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      .info-label {
+        font-size: 12px;
+        color: #7f8c8d;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+      }
+
+      .info-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #2c3e50;
+      }
+
+      .canvas-container {
+        position: relative;
+        display: inline-block;
+        margin-bottom: 20px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      #imageCanvas {
+        display: block;
+        max-width: 100%;
+        height: auto;
+      }
+
+      .prediction-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        z-index: 3;
+      }
+
+      #annotationCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        cursor: crosshair;
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      .drawing-mode {
+        border-color: #3498db;
+        box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+      }
+
+      .prediction-box {
+        position: absolute;
+        border: 3px solid #e74c3c;
+        background: rgba(231, 76, 60, 0.1);
+        box-sizing: border-box;
+      }
+
+      .prediction-label {
+        position: absolute;
+        top: -20px;
+        left: 0;
+        background: #e74c3c;
+        color: white;
+        padding: 2px 6px;
+        font-size: 12px;
+        border-radius: 3px;
+        white-space: nowrap;
+      }
+
+      .log {
+        margin-top: 20px;
+        padding: 15px;
+        background: #2c3e50;
+        color: #ecf0f1;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+
+      .log-entry {
+        margin-bottom: 5px;
+      }
+
+      .log-entry.success {
+        color: #2ecc71;
+      }
+
+      .log-entry.error {
+        color: #e74c3c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🚀 SSD Training Demo</h1>
+      <p class="subtitle">
+        Train on a single image and watch predictions improve over time
+      </p>
+
+      <div class="upload-section">
+        <div class="file-input-wrapper">
+          <label for="imageInput">Select an image:</label>
+          <input type="file" id="imageInput" accept="image/*" />
+        </div>
+        <button id="startTrainingBtn" disabled>Start Training</button>
+        <button id="stopTrainingBtn" disabled>Stop Training</button>
+        <button id="drawBoxBtn" disabled>Draw Target Box</button>
+        <button id="clearBoxBtn" disabled>Clear Box</button>
+        <div class="status" id="status">Please select an image to begin</div>
+      </div>
+
+      <div class="training-info">
+        <div class="info-card">
+          <div class="info-label">Epoch</div>
+          <div class="info-value" id="epochValue">0</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Loss</div>
+          <div class="info-value" id="lossValue">-</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Box Loss</div>
+          <div class="info-value" id="boxLossValue">-</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Class Loss</div>
+          <div class="info-value" id="classLossValue">-</div>
+        </div>
+      </div>
+
+      <div class="canvas-container" id="canvasContainer">
+        <canvas id="imageCanvas"></canvas>
+        <canvas id="annotationCanvas"></canvas>
+        <canvas id="predictionCanvas" class="prediction-overlay"></canvas>
+      </div>
+
+      <div class="log" id="log"></div>
+    </div>
+
+    <script>
+      // Global variables
+      let detectionModel = null
+      let featureExtractor = null
+      let isTraining = false
+      let currentEpoch = 0
+      let imageElement = null
+      let imageTensor = null
+      let targetBox = null // [x, y, w, h] normalized coordinates
+      let targetClass = null // one-hot encoded class
+      let currentImageFileName = null
+
+      // Drawing state
+      let isDrawingMode = false
+      let isDrawing = false
+      let drawStartX = 0
+      let drawStartY = 0
+
+      const IMAGE_SIZE = 224
+      const NUM_CLASSES = 2 // background + 1 object class
+      const LEARNING_RATE = 1e-4
+
+      // UI elements
+      const imageInput = document.getElementById('imageInput')
+      const startBtn = document.getElementById('startTrainingBtn')
+      const stopBtn = document.getElementById('stopTrainingBtn')
+      const drawBoxBtn = document.getElementById('drawBoxBtn')
+      const clearBoxBtn = document.getElementById('clearBoxBtn')
+      const statusDiv = document.getElementById('status')
+      const imageCanvas = document.getElementById('imageCanvas')
+      const annotationCanvas = document.getElementById('annotationCanvas')
+      const predictionCanvas = document.getElementById('predictionCanvas')
+      const canvasContainer = document.getElementById('canvasContainer')
+      const ctx = imageCanvas.getContext('2d')
+      const annotCtx = annotationCanvas.getContext('2d')
+      const predCtx = predictionCanvas.getContext('2d')
+      const logDiv = document.getElementById('log')
+
+      // Logging utility
+      function log(message, type = 'info') {
+        const entry = document.createElement('div')
+        entry.className = `log-entry ${type}`
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
+        logDiv.appendChild(entry)
+        logDiv.scrollTop = logDiv.scrollHeight
+        console.log(message)
+      }
+
+      // LocalStorage utilities
+      function getStorageKey(fileName) {
+        return `ssd_target_box_${fileName}`
+      }
+
+      function saveTargetBox(fileName, box) {
+        if (!fileName) return
+        const key = getStorageKey(fileName)
+        localStorage.setItem(key, JSON.stringify(box))
+        log(`Target box saved for ${fileName}`, 'success')
+      }
+
+      function loadTargetBox(fileName) {
+        if (!fileName) return null
+        const key = getStorageKey(fileName)
+        const saved = localStorage.getItem(key)
+        if (saved) {
+          try {
+            return JSON.parse(saved)
+          } catch (e) {
+            log(`Error loading saved box: ${e.message}`, 'error')
+            return null
+          }
+        }
+        return null
+      }
+
+      function clearTargetBox(fileName) {
+        if (!fileName) return
+        const key = getStorageKey(fileName)
+        localStorage.removeItem(key)
+        log(`Target box cleared for ${fileName}`, 'info')
+      }
+
+      // Update target box tensor from normalized coordinates
+      function updateTargetBox(centerX, centerY, width, height) {
+        targetBox = tf.tensor2d([[centerX, centerY, width, height]])
+        if (currentImageFileName) {
+          saveTargetBox(currentImageFileName, {
+            centerX,
+            centerY,
+            width,
+            height,
+          })
+        }
+        log(
+          `Target box updated: [${centerX.toFixed(2)}, ${centerY.toFixed(2)}, ${width.toFixed(2)}, ${height.toFixed(2)}]`,
+          'info',
+        )
+        drawTargetBox()
+      }
+
+      // Draw target box on annotation canvas
+      function drawTargetBox() {
+        if (!targetBox || !imageCanvas) return
+
+        annotCtx.clearRect(
+          0,
+          0,
+          annotationCanvas.width,
+          annotationCanvas.height,
+        )
+
+        targetBox.array().then(data => {
+          const box = data[0]
+          const centerX = box[0] * imageCanvas.width
+          const centerY = box[1] * imageCanvas.height
+          const width = box[2] * imageCanvas.width
+          const height = box[3] * imageCanvas.height
+          const x1 = centerX - width / 2
+          const y1 = centerY - height / 2
+
+          // Draw target box
+          annotCtx.strokeStyle = '#2ecc71'
+          annotCtx.lineWidth = 3
+          annotCtx.setLineDash([5, 5])
+          annotCtx.strokeRect(x1, y1, width, height)
+          annotCtx.setLineDash([])
+
+          // Draw label
+          annotCtx.fillStyle = '#2ecc71'
+          annotCtx.fillRect(x1, y1 - 25, 150, 25)
+          annotCtx.fillStyle = 'white'
+          annotCtx.font = '14px Arial'
+          annotCtx.fillText('Target Box (Green)', x1 + 5, y1 - 8)
+        })
+      }
+
+      // Initialize: Load MobileNet feature extractor
+      async function initializeModel() {
+        log('Loading MobileNet feature extractor...', 'info')
+        statusDiv.textContent = 'Loading MobileNet...'
+
+        try {
+          // Load MobileNet v3 feature vector model (local)
+          // This is a GraphModel that outputs feature vectors directly
+          const modelUrl =
+            './saved_models/mobilenet-v3-tfjs-large-100-224-feature-vector-v1/model.json'
+
+          log(`Loading from: ${modelUrl}`, 'info')
+          const mobilenetGraph = await tf.loadGraphModel(modelUrl)
+
+          // GraphModel outputs features directly [batch, 1280]
+          // We'll wrap it in a function that can be used in our LayersModel
+          // For now, we'll use it directly in buildDetectionModel
+          featureExtractor = mobilenetGraph
+
+          log('MobileNet loaded successfully (GraphModel)', 'success')
+          log('Feature vector size: 1280', 'info')
+
+          // Build detection model
+          buildDetectionModel()
+        } catch (error) {
+          log(`Error loading model: ${error.message}`, 'error')
+          statusDiv.textContent = `Error: ${error.message}`
+          log('Trying alternative model path...', 'info')
+
+          // Fallback: try classification model
+          try {
+            const altModelUrl =
+              './saved_models/mobilenet-v3-tfjs-large-100-224-classification-v1/model.json'
+            log(`Trying: ${altModelUrl}`, 'info')
+            const mobilenetGraph = await tf.loadGraphModel(altModelUrl)
+
+            // For classification model, we need to extract features before the classification layer
+            // GraphModels don't have layers, so we'll use it as-is and handle in buildDetectionModel
+            featureExtractor = mobilenetGraph
+            log(
+              'MobileNet loaded successfully (fallback, classification model)',
+              'success',
+            )
+            buildDetectionModel()
+          } catch (fallbackError) {
+            log(`Fallback also failed: ${fallbackError.message}`, 'error')
+            statusDiv.textContent = `Error: ${fallbackError.message}. Make sure the model files are in saved_models/ directory.`
+          }
+        }
+      }
+
+      // Build SSD detection head
+      function buildDetectionModel() {
+        log('Building detection model...', 'info')
+
+        // Check if featureExtractor is a GraphModel
+        const isGraphModel = featureExtractor && 'execute' in featureExtractor
+
+        if (isGraphModel) {
+          // For GraphModel, build a simple detection head that takes features as input
+          // Features will be extracted separately in the training loop
+          const featureInput = tf.input({ shape: [1280] }) // Feature vector size
+
+          // Bounding box head
+          const boxHead = tf.layers
+            .dense({
+              units: 4,
+              activation: 'sigmoid',
+              name: 'box_head',
+            })
+            .apply(featureInput)
+
+          // Classification head
+          const classHead = tf.layers
+            .dense({
+              units: NUM_CLASSES,
+              activation: 'softmax',
+              name: 'class_head',
+            })
+            .apply(featureInput)
+
+          detectionModel = tf.model({
+            inputs: featureInput,
+            outputs: [boxHead, classHead],
+          })
+        } else {
+          // For LayersModel, use the original approach
+          const input = tf.input({ shape: [IMAGE_SIZE, IMAGE_SIZE, 3] })
+          const features = featureExtractor.apply(input)
+
+          // Flatten if needed
+          const flattened = tf.layers.flatten().apply(features)
+
+          // Bounding box head
+          const boxHead = tf.layers
+            .dense({
+              units: 4,
+              activation: 'sigmoid',
+              name: 'box_head',
+            })
+            .apply(flattened)
+
+          // Classification head
+          const classHead = tf.layers
+            .dense({
+              units: NUM_CLASSES,
+              activation: 'softmax',
+              name: 'class_head',
+            })
+            .apply(flattened)
+
+          detectionModel = tf.model({
+            inputs: input,
+            outputs: [boxHead, classHead],
+          })
+        }
+
+        // Compile model
+        const optimizer = tf.train.adam(LEARNING_RATE)
+        detectionModel.compile({
+          optimizer: optimizer,
+          loss: ['meanSquaredError', 'categoricalCrossentropy'],
+          lossWeights: [1.0, 0.5], // Weight box loss more
+          metrics: ['accuracy'],
+        })
+
+        log('Detection model built and compiled', 'success')
+        log(`Model summary: ${detectionModel.countParams()} parameters`, 'info')
+      }
+
+      // Load image from file
+      function loadImageFromFile(file) {
+        if (!file) return
+
+        currentImageFileName = file.name
+        log(`Loading image: ${file.name}`, 'info')
+        statusDiv.textContent = 'Loading image...'
+
+        const reader = new FileReader()
+        reader.onload = async event => {
+          imageElement = new Image()
+          imageElement.onload = async () => {
+            // Draw image to canvas
+            imageCanvas.width = imageElement.width
+            imageCanvas.height = imageElement.height
+            annotationCanvas.width = imageElement.width
+            annotationCanvas.height = imageElement.height
+            predictionCanvas.width = imageElement.width
+            predictionCanvas.height = imageElement.height
+            ctx.drawImage(imageElement, 0, 0)
+
+            // Preprocess image for model
+            // MobileNet v3 expects input normalized to [-1, 1]
+            imageTensor = tf.browser
+              .fromPixels(imageElement)
+              .resizeNearestNeighbor([IMAGE_SIZE, IMAGE_SIZE])
+              .toFloat()
+              .div(127.5) // Normalize to [0, 2]
+              .sub(1.0) // Normalize to [-1, 1]
+              .expandDims(0)
+
+            // Load saved target box or use default
+            const savedBox = loadTargetBox(file.name)
+            let centerX, centerY, width, height
+
+            if (savedBox) {
+              centerX = savedBox.centerX
+              centerY = savedBox.centerY
+              width = savedBox.width
+              height = savedBox.height
+              log('Loaded saved target box from localStorage', 'success')
+            } else {
+              // Default: center of image, 40% size
+              centerX = 0.5
+              centerY = 0.5
+              width = 0.4
+              height = 0.4
+            }
+
+            targetBox = tf.tensor2d([[centerX, centerY, width, height]])
+            targetClass = tf.tensor2d([[0, 1]]) // [background, object] - object class
+
+            // Draw target box
+            drawTargetBox()
+
+            log('Image loaded and preprocessed', 'success')
+            log(
+              `Target box: [${centerX.toFixed(2)}, ${centerY.toFixed(2)}, ${width.toFixed(2)}, ${height.toFixed(2)}]`,
+              'info',
+            )
+            statusDiv.textContent =
+              'Image loaded. Draw target box or click "Start Training" to begin.'
+            startBtn.disabled = false
+            drawBoxBtn.disabled = false
+            clearBoxBtn.disabled = false
+          }
+          imageElement.src = event.target.result
+        }
+        reader.readAsDataURL(file)
+      }
+
+      // Handle image selection
+      imageInput.addEventListener('change', async e => {
+        const file = e.target.files[0]
+        loadImageFromFile(file)
+      })
+
+      // Training loop
+      async function trainEpoch() {
+        if (!isTraining || !detectionModel || !imageTensor) return
+
+        try {
+          const isGraphModel = featureExtractor && 'execute' in featureExtractor
+          let xs, ys
+
+          if (isGraphModel) {
+            // Extract features using GraphModel (frozen, no gradients)
+            const features = featureExtractor.execute(
+              { 'inputs:0': imageTensor },
+              'Identity:0',
+            )
+            xs = features
+            ys = [targetBox, targetClass]
+          } else {
+            // For LayersModel, use image directly
+            xs = imageTensor
+            ys = [targetBox, targetClass]
+          }
+
+          // Train for one epoch (1 batch)
+          const history = await detectionModel.fit(xs, ys, {
+            epochs: 1,
+            batchSize: 1,
+            verbose: 0,
+          })
+
+          currentEpoch++
+
+          // Update UI
+          document.getElementById('epochValue').textContent = currentEpoch
+
+          const boxLoss = history.history.loss[0]
+          const classLoss = history.history.loss[1] || 0
+          const totalLoss = boxLoss + classLoss
+
+          document.getElementById('lossValue').textContent =
+            totalLoss.toFixed(4)
+          document.getElementById('boxLossValue').textContent =
+            boxLoss.toFixed(4)
+          document.getElementById('classLossValue').textContent =
+            classLoss.toFixed(4)
+
+          // Cleanup if GraphModel (features tensor)
+          if (isGraphModel && xs !== imageTensor) {
+            xs.dispose()
+          }
+
+          // Run inference and visualize
+          await visualizePredictions()
+
+          // Continue training
+          if (isTraining) {
+            // Use requestAnimationFrame for smooth updates
+            requestAnimationFrame(() => {
+              setTimeout(() => trainEpoch(), 10) // Small delay to allow UI updates
+            })
+          }
+        } catch (error) {
+          log(`Training error: ${error.message}`, 'error')
+          stopTraining()
+        }
+      }
+
+      // Visualize predictions
+      async function visualizePredictions() {
+        if (!detectionModel || !imageTensor) return
+
+        try {
+          const isGraphModel = featureExtractor && 'execute' in featureExtractor
+          let modelInput
+
+          if (isGraphModel) {
+            // Extract features first
+            const features = featureExtractor.execute(
+              { 'inputs:0': imageTensor },
+              'Identity:0',
+            )
+            modelInput = features
+          } else {
+            modelInput = imageTensor
+          }
+
+          const [predBoxes, predClasses] = detectionModel.predict(modelInput)
+
+          // Cleanup if GraphModel
+          if (isGraphModel && modelInput !== imageTensor) {
+            modelInput.dispose()
+          }
+
+          // Get values
+          const boxData = await predBoxes.data()
+          const classData = await predClasses.data()
+
+          // Clear previous predictions
+          predCtx.clearRect(
+            0,
+            0,
+            predictionCanvas.width,
+            predictionCanvas.height,
+          )
+
+          // Draw predicted bounding box
+          const x = boxData[0] * imageCanvas.width
+          const y = boxData[1] * imageCanvas.height
+          const w = boxData[2] * imageCanvas.width
+          const h = boxData[3] * imageCanvas.height
+
+          // Convert center coordinates to top-left
+          const x1 = x - w / 2
+          const y1 = y - h / 2
+
+          // Draw box
+          predCtx.strokeStyle = '#e74c3c'
+          predCtx.lineWidth = 3
+          predCtx.strokeRect(x1, y1, w, h)
+
+          // Draw label
+          const confidence = classData[1] // Object class probability
+          predCtx.fillStyle = '#e74c3c'
+          predCtx.fillRect(x1, y1 - 20, 100, 20)
+          predCtx.fillStyle = 'white'
+          predCtx.font = '12px Arial'
+          predCtx.fillText(
+            `Object: ${(confidence * 100).toFixed(1)}%`,
+            x1 + 5,
+            y1 - 5,
+          )
+
+          // Target box is drawn on annotation canvas, not here
+
+          // Cleanup
+          predBoxes.dispose()
+          predClasses.dispose()
+        } catch (error) {
+          log(`Visualization error: ${error.message}`, 'error')
+        }
+      }
+
+      // Start training
+      startBtn.addEventListener('click', () => {
+        if (!detectionModel || !imageTensor) {
+          log('Please load an image first', 'error')
+          return
+        }
+
+        isTraining = true
+        currentEpoch = 0
+        startBtn.disabled = true
+        stopBtn.disabled = false
+        statusDiv.textContent = 'Training in progress...'
+        log('Training started', 'success')
+
+        trainEpoch()
+      })
+
+      // Stop training
+      stopBtn.addEventListener('click', () => {
+        stopTraining()
+      })
+
+      function stopTraining() {
+        isTraining = false
+        startBtn.disabled = false
+        stopBtn.disabled = true
+        statusDiv.textContent = 'Training stopped'
+        log('Training stopped', 'info')
+      }
+
+      // Drawing mode toggle
+      drawBoxBtn.addEventListener('click', () => {
+        isDrawingMode = !isDrawingMode
+        if (isDrawingMode) {
+          drawBoxBtn.textContent = 'Cancel Drawing'
+          drawBoxBtn.style.background = '#e74c3c'
+          canvasContainer.classList.add('drawing-mode')
+          annotationCanvas.style.pointerEvents = 'auto'
+          statusDiv.textContent =
+            'Drawing mode: Click and drag on the image to draw target box'
+          log('Drawing mode enabled', 'info')
+        } else {
+          drawBoxBtn.textContent = 'Draw Target Box'
+          drawBoxBtn.style.background = '#3498db'
+          canvasContainer.classList.remove('drawing-mode')
+          annotationCanvas.style.pointerEvents = 'none'
+          statusDiv.textContent = 'Drawing mode disabled'
+          log('Drawing mode disabled', 'info')
+        }
+      })
+
+      // Clear box button
+      clearBoxBtn.addEventListener('click', () => {
+        if (currentImageFileName) {
+          clearTargetBox(currentImageFileName)
+          annotCtx.clearRect(
+            0,
+            0,
+            annotationCanvas.width,
+            annotationCanvas.height,
+          )
+          // Reset to default
+          updateTargetBox(0.5, 0.5, 0.4, 0.4)
+        }
+      })
+
+      // Mouse event handlers for drawing
+      function getCanvasCoordinates(e) {
+        const rect = annotationCanvas.getBoundingClientRect()
+        const scaleX = annotationCanvas.width / rect.width
+        const scaleY = annotationCanvas.height / rect.height
+        return {
+          x: (e.clientX - rect.left) * scaleX,
+          y: (e.clientY - rect.top) * scaleY,
+        }
+      }
+
+      annotationCanvas.addEventListener('mousedown', e => {
+        if (!isDrawingMode || !imageElement) return
+        isDrawing = true
+        const coords = getCanvasCoordinates(e)
+        drawStartX = coords.x
+        drawStartY = coords.y
+      })
+
+      annotationCanvas.addEventListener('mousemove', e => {
+        if (!isDrawingMode || !isDrawing || !imageElement) return
+        const coords = getCanvasCoordinates(e)
+
+        // Clear and redraw
+        annotCtx.clearRect(
+          0,
+          0,
+          annotationCanvas.width,
+          annotationCanvas.height,
+        )
+        drawTargetBox() // Redraw existing target box
+
+        // Draw current selection
+        const width = coords.x - drawStartX
+        const height = coords.y - drawStartY
+        annotCtx.strokeStyle = '#3498db'
+        annotCtx.lineWidth = 2
+        annotCtx.setLineDash([3, 3])
+        annotCtx.strokeRect(drawStartX, drawStartY, width, height)
+        annotCtx.setLineDash([])
+      })
+
+      annotationCanvas.addEventListener('mouseup', e => {
+        if (!isDrawingMode || !isDrawing || !imageElement) return
+        isDrawing = false
+
+        const coords = getCanvasCoordinates(e)
+        const x1 = Math.min(drawStartX, coords.x)
+        const y1 = Math.min(drawStartY, coords.y)
+        const x2 = Math.max(drawStartX, coords.x)
+        const y2 = Math.max(drawStartY, coords.y)
+
+        const width = x2 - x1
+        const height = y2 - y1
+
+        // Only update if box is large enough
+        if (width > 10 && height > 10) {
+          // Convert to normalized center coordinates
+          const centerX = (x1 + width / 2) / imageCanvas.width
+          const centerY = (y1 + height / 2) / imageCanvas.height
+          const normWidth = width / imageCanvas.width
+          const normHeight = height / imageCanvas.height
+
+          // Clamp to [0, 1]
+          const clampedCenterX = Math.max(0, Math.min(1, centerX))
+          const clampedCenterY = Math.max(0, Math.min(1, centerY))
+          const clampedWidth = Math.max(0.01, Math.min(1, normWidth))
+          const clampedHeight = Math.max(0.01, Math.min(1, normHeight))
+
+          updateTargetBox(
+            clampedCenterX,
+            clampedCenterY,
+            clampedWidth,
+            clampedHeight,
+          )
+
+          // Exit drawing mode
+          isDrawingMode = false
+          drawBoxBtn.textContent = 'Draw Target Box'
+          drawBoxBtn.style.background = '#3498db'
+          canvasContainer.classList.remove('drawing-mode')
+          annotationCanvas.style.pointerEvents = 'none'
+          statusDiv.textContent =
+            'Target box updated. Click "Start Training" to begin.'
+        } else {
+          annotCtx.clearRect(
+            0,
+            0,
+            annotationCanvas.width,
+            annotationCanvas.height,
+          )
+          drawTargetBox()
+        }
+      })
+
+      annotationCanvas.addEventListener('mouseleave', () => {
+        if (isDrawing) {
+          isDrawing = false
+          annotCtx.clearRect(
+            0,
+            0,
+            annotationCanvas.width,
+            annotationCanvas.height,
+          )
+          drawTargetBox()
+        }
+      })
+
+      // Initialize on page load
+      window.addEventListener('load', () => {
+        log('Initializing...', 'info')
+        initializeModel()
+
+        // Check if Firefox has preserved a file selection
+        if (imageInput.files && imageInput.files.length > 0) {
+          log('Found previously selected file, loading...', 'info')
+          loadImageFromFile(imageInput.files[0])
+        }
+      })
+    </script>
+  </body>
+</html>
