@@ -1175,26 +1175,51 @@
         // Draw target box
         drawTargetBoxForImage(index, dataset)
 
-        // Drawing event listeners
-        annotCanvas.addEventListener('mousedown', e => {
-          if (!isDrawingMode) return
-          isDrawing = true
-          currentDrawingImageIndex = index
-          item.classList.add('active')
+        // Helper function to get coordinates from mouse or touch events
+        function getEventCoordinates(e) {
           const rect = annotCanvas.getBoundingClientRect()
           const scaleX = annotCanvas.width / rect.width
           const scaleY = annotCanvas.height / rect.height
-          drawStartX = (e.clientX - rect.left) * scaleX
-          drawStartY = (e.clientY - rect.top) * scaleY
+          let clientX, clientY
+
+          if (e.touches && e.touches.length > 0) {
+            // Touch event
+            clientX = e.touches[0].clientX
+            clientY = e.touches[0].clientY
+          } else if (e.changedTouches && e.changedTouches.length > 0) {
+            // Touch end/cancel event
+            clientX = e.changedTouches[0].clientX
+            clientY = e.changedTouches[0].clientY
+          } else {
+            // Mouse event
+            clientX = e.clientX
+            clientY = e.clientY
+          }
+
+          return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY,
+          }
+        }
+
+        // Drawing event listeners - Mouse events
+        annotCanvas.addEventListener('mousedown', e => {
+          if (!isDrawingMode) return
+          e.preventDefault()
+          isDrawing = true
+          currentDrawingImageIndex = index
+          item.classList.add('active')
+          const coords = getEventCoordinates(e)
+          drawStartX = coords.x
+          drawStartY = coords.y
         })
 
         annotCanvas.addEventListener('mousemove', e => {
           if (!isDrawing || currentDrawingImageIndex !== index) return
-          const rect = annotCanvas.getBoundingClientRect()
-          const scaleX = annotCanvas.width / rect.width
-          const scaleY = annotCanvas.height / rect.height
-          const currentX = (e.clientX - rect.left) * scaleX
-          const currentY = (e.clientY - rect.top) * scaleY
+          e.preventDefault()
+          const coords = getEventCoordinates(e)
+          const currentX = coords.x
+          const currentY = coords.y
 
           const annotCtx = annotCanvas.getContext('2d')
           annotCtx.clearRect(0, 0, annotCanvas.width, annotCanvas.height)
@@ -1214,13 +1239,12 @@
 
         annotCanvas.addEventListener('mouseup', e => {
           if (!isDrawing || currentDrawingImageIndex !== index) return
+          e.preventDefault()
           isDrawing = false
 
-          const rect = annotCanvas.getBoundingClientRect()
-          const scaleX = annotCanvas.width / rect.width
-          const scaleY = annotCanvas.height / rect.height
-          const endX = (e.clientX - rect.left) * scaleX
-          const endY = (e.clientY - rect.top) * scaleY
+          const coords = getEventCoordinates(e)
+          const endX = coords.x
+          const endY = coords.y
 
           const x1 = Math.min(drawStartX, endX) / canvasSize
           const y1 = Math.min(drawStartY, endY) / canvasSize
@@ -1249,6 +1273,95 @@
             currentDrawingImageIndex = -1
           }
         })
+
+        // Drawing event listeners - Touch events (for iPad/mobile)
+        annotCanvas.addEventListener(
+          'touchstart',
+          e => {
+            if (!isDrawingMode) return
+            e.preventDefault()
+            isDrawing = true
+            currentDrawingImageIndex = index
+            item.classList.add('active')
+            const coords = getEventCoordinates(e)
+            drawStartX = coords.x
+            drawStartY = coords.y
+          },
+          { passive: false },
+        )
+
+        annotCanvas.addEventListener(
+          'touchmove',
+          e => {
+            if (!isDrawing || currentDrawingImageIndex !== index) return
+            e.preventDefault()
+            const coords = getEventCoordinates(e)
+            const currentX = coords.x
+            const currentY = coords.y
+
+            const annotCtx = annotCanvas.getContext('2d')
+            annotCtx.clearRect(0, 0, annotCanvas.width, annotCanvas.height)
+            drawTargetBoxForImage(index, dataset)
+
+            const x1 = Math.min(drawStartX, currentX)
+            const y1 = Math.min(drawStartY, currentY)
+            const width = Math.abs(currentX - drawStartX)
+            const height = Math.abs(currentY - drawStartY)
+
+            annotCtx.strokeStyle = '#3498db'
+            annotCtx.lineWidth = 2
+            annotCtx.setLineDash([5, 5])
+            annotCtx.strokeRect(x1, y1, width, height)
+            annotCtx.setLineDash([])
+          },
+          { passive: false },
+        )
+
+        annotCanvas.addEventListener(
+          'touchend',
+          e => {
+            if (!isDrawing || currentDrawingImageIndex !== index) return
+            e.preventDefault()
+            isDrawing = false
+
+            const coords = getEventCoordinates(e)
+            const endX = coords.x
+            const endY = coords.y
+
+            const x1 = Math.min(drawStartX, endX) / canvasSize
+            const y1 = Math.min(drawStartY, endY) / canvasSize
+            const x2 = Math.max(drawStartX, endX) / canvasSize
+            const y2 = Math.max(drawStartY, endY) / canvasSize
+
+            const centerX = (x1 + x2) / 2
+            const centerY = (y1 + y2) / 2
+            const width = x2 - x1
+            const height = y2 - y1
+
+            updateTargetBox(index, centerX, centerY, width, height, dataset)
+            item.classList.remove('active')
+            currentDrawingImageIndex = -1
+
+            // Update prediction after drawing new box
+            if (detectionModel) {
+              visualizePredictions()
+            }
+          },
+          { passive: false },
+        )
+
+        annotCanvas.addEventListener(
+          'touchcancel',
+          e => {
+            if (isDrawing && currentDrawingImageIndex === index) {
+              e.preventDefault()
+              isDrawing = false
+              item.classList.remove('active')
+              currentDrawingImageIndex = -1
+            }
+          },
+          { passive: false },
+        )
       }
 
       // Display all images in grid
