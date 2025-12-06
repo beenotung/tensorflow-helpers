@@ -337,7 +337,7 @@
             />
           </label>
           <label for="showImageNamesToggle" style="margin-left: 15px">
-            <input type="checkbox" id="showImageNamesToggle" checked />
+            <input type="checkbox" id="showImageNamesToggle" />
             Show Image Names
           </label>
           <label for="numColumnsInput" style="margin-left: 15px">
@@ -2160,6 +2160,9 @@
       if (savedColumns) {
         numColumnsInput.value = savedColumns
         updateImageGridColumns(parseInt(savedColumns, 10))
+      } else {
+        // Default to 5 columns if no saved preference
+        updateImageGridColumns(5)
       }
 
       numColumnsInput.addEventListener('input', () => {
