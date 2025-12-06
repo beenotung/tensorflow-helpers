@@ -1,0 +1,1294 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SSD Training - Simple</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.2.0"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+          Cantarell, sans-serif;
+        padding: 20px;
+        background: #f5f5f5;
+        color: #333;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      h1 {
+        margin-bottom: 10px;
+        color: #2c3e50;
+      }
+
+      .subtitle {
+        color: #7f8c8d;
+        margin-bottom: 30px;
+      }
+
+      .upload-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+      }
+
+      button {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-right: 10px;
+        transition: background 0.3s;
+      }
+
+      button:hover:not(:disabled) {
+        background: #2980b9;
+      }
+
+      button:disabled {
+        background: #bdc3c7;
+        cursor: not-allowed;
+      }
+
+      .status {
+        margin-top: 15px;
+        padding: 12px;
+        background: #e8f4f8;
+        border-left: 4px solid #3498db;
+        border-radius: 4px;
+      }
+
+      .training-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+      }
+
+      .info-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      .info-label {
+        font-size: 12px;
+        color: #7f8c8d;
+        margin-bottom: 5px;
+      }
+
+      .info-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #2c3e50;
+      }
+
+      .images-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 20px;
+        margin-top: 20px;
+      }
+
+      .image-item {
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 10px;
+        background: #fafafa;
+      }
+
+      .image-item.active {
+        border-color: #3498db;
+        background: #e8f4f8;
+      }
+
+      .image-name {
+        font-size: 12px;
+        margin-bottom: 10px;
+        word-wrap: break-word;
+        word-break: break-all;
+        overflow-wrap: break-word;
+        max-width: 100%;
+        line-height: 1.4;
+        color: #555;
+        transition:
+          opacity 0.2s,
+          max-height 0.2s;
+      }
+
+      .hide-image-names .image-name {
+        display: none;
+      }
+
+      .image-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        font-size: 12px;
+      }
+
+      .no-object-label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+      }
+
+      .no-object-label input[type='checkbox'] {
+        cursor: pointer;
+      }
+
+      .image-item.no-object {
+        opacity: 0.7;
+        border-color: #95a5a6;
+      }
+
+      .image-item.no-object .image-name::after {
+        content: ' (No Object)';
+        color: #e74c3c;
+        font-weight: bold;
+      }
+
+      .canvas-container {
+        position: relative;
+        width: 100%;
+        margin-bottom: 10px;
+      }
+
+      .image-canvas,
+      .annotation-canvas,
+      .prediction-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .image-canvas {
+        z-index: 1;
+      }
+
+      .annotation-canvas {
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      .prediction-overlay {
+        z-index: 3;
+        pointer-events: none;
+        visibility: visible;
+        opacity: 1;
+      }
+
+      .drawing-mode .annotation-canvas {
+        pointer-events: auto;
+        cursor: crosshair;
+      }
+
+      .image-item.active .annotation-canvas {
+        pointer-events: auto;
+      }
+
+      .log-container {
+        margin-top: 20px;
+        padding: 15px;
+        background: #2c3e50;
+        color: #ecf0f1;
+        border-radius: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+      }
+
+      .log-entry {
+        margin-bottom: 5px;
+        padding: 3px 0;
+      }
+
+      .log-entry.success {
+        color: #2ecc71;
+      }
+
+      .log-entry.error {
+        color: #e74c3c;
+      }
+
+      .log-entry.info {
+        color: #3498db;
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      .controls label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .controls input {
+        padding: 4px 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        width: 80px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>SSD Training - Simple</h1>
+      <p class="subtitle">
+        Load images, mark target boxes, and train on all images
+      </p>
+
+      <div class="upload-section">
+        <div class="controls">
+          <input
+            type="file"
+            id="imageInput"
+            accept="image/*"
+            multiple
+            style="display: none"
+          />
+          <button onclick="document.getElementById('imageInput').click()">
+            Select Images
+          </button>
+          <button id="drawBoxBtn" disabled>Draw Target Box</button>
+          <button id="startTrainingBtn" disabled>Start Training</button>
+          <button id="stopTrainingBtn" disabled>Stop Training</button>
+        </div>
+
+        <div class="controls" style="margin-top: 10px">
+          <label for="learningRateInput">
+            Learning Rate:
+            <input
+              type="number"
+              id="learningRateInput"
+              min="1e-6"
+              max="1e-2"
+              step="1e-5"
+              value="0.0001"
+            />
+          </label>
+          <label for="showImageNamesToggle" style="margin-left: 15px">
+            <input type="checkbox" id="showImageNamesToggle" checked />
+            Show Image Names
+          </label>
+          <label for="numColumnsInput" style="margin-left: 15px">
+            Columns:
+            <input
+              type="number"
+              id="numColumnsInput"
+              min="1"
+              max="10"
+              step="1"
+              value="5"
+              style="width: 50px"
+            />
+          </label>
+        </div>
+
+        <div class="status" id="statusDiv">Ready to load images</div>
+      </div>
+
+      <div class="training-info">
+        <div class="info-card">
+          <div class="info-label">Epoch</div>
+          <div class="info-value" id="epochValue">0</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Total Loss</div>
+          <div class="info-value" id="totalLossValue">-</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Box Loss</div>
+          <div class="info-value" id="boxLossValue">-</div>
+        </div>
+        <div class="info-card">
+          <div class="info-label">Class Loss</div>
+          <div class="info-value" id="classLossValue">-</div>
+        </div>
+      </div>
+
+      <div class="images-grid" id="imagesGrid"></div>
+
+      <div class="log-container" id="logContainer"></div>
+    </div>
+
+    <script>
+      // Constants
+      const IMAGE_SIZE = 224
+      const NUM_CLASSES = 2 // background + 1 object class
+      let currentLearningRate = 1e-4
+
+      // UI elements
+      const imageInput = document.getElementById('imageInput')
+      const startBtn = document.getElementById('startTrainingBtn')
+      const stopBtn = document.getElementById('stopTrainingBtn')
+      const drawBoxBtn = document.getElementById('drawBoxBtn')
+      const learningRateInput = document.getElementById('learningRateInput')
+      const statusDiv = document.getElementById('statusDiv')
+      const imagesGrid = document.getElementById('imagesGrid')
+      const logContainer = document.getElementById('logContainer')
+
+      // State
+      let featureExtractor = null
+      let detectionModel = null
+      let isTraining = false
+      let currentEpoch = 0
+      let imageDataset = []
+      let isDrawingMode = false
+      let isDrawing = false
+      let drawStartX = 0
+      let drawStartY = 0
+      let currentDrawingImageIndex = -1
+
+      // Logging utility
+      function log(message, type = 'info') {
+        const entry = document.createElement('div')
+        entry.className = `log-entry ${type}`
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`
+        logContainer.appendChild(entry)
+        logContainer.scrollTop = logContainer.scrollHeight
+        console.log(`[${type.toUpperCase()}]`, message)
+      }
+
+      // LocalStorage utilities
+      function getStorageKey(fileName) {
+        return `targetBox_${fileName}`
+      }
+
+      function saveTargetBox(fileName, box) {
+        const key = getStorageKey(fileName)
+        const data = {
+          centerX: box[0],
+          centerY: box[1],
+          width: box[2],
+          height: box[3],
+        }
+        localStorage.setItem(key, JSON.stringify(data))
+      }
+
+      function loadTargetBox(fileName) {
+        const key = getStorageKey(fileName)
+        const data = localStorage.getItem(key)
+        if (data) {
+          const parsed = JSON.parse(data)
+          return [parsed.centerX, parsed.centerY, parsed.width, parsed.height]
+        }
+        return null
+      }
+
+      function getNoObjectKey(fileName) {
+        return `noObject_${fileName}`
+      }
+
+      function saveNoObjectFlag(fileName, isNoObject) {
+        const key = getNoObjectKey(fileName)
+        if (isNoObject) {
+          localStorage.setItem(key, 'true')
+        } else {
+          localStorage.removeItem(key)
+        }
+      }
+
+      function loadNoObjectFlag(fileName) {
+        const key = getNoObjectKey(fileName)
+        return localStorage.getItem(key) === 'true'
+      }
+
+      // Initialize: Load MobileNet feature extractor
+      async function initializeModel() {
+        log('Loading MobileNet feature extractor...', 'info')
+        statusDiv.textContent = 'Loading MobileNet...'
+
+        try {
+          const modelUrl =
+            '/saved_models/mobilenet-v3-tfjs-large-100-224-feature-vector-v1/model.json'
+
+          log(`Loading from: ${modelUrl}`, 'info')
+          const mobilenetGraph = await tf.loadGraphModel(modelUrl)
+
+          featureExtractor = mobilenetGraph
+
+          log('MobileNet loaded successfully', 'success')
+          buildDetectionModel()
+        } catch (error) {
+          log(`Error loading model: ${error.message}`, 'error')
+          statusDiv.textContent = `Error: ${error.message}`
+        }
+      }
+
+      // Build SSD detection head
+      function buildDetectionModel() {
+        log('Building detection model...', 'info')
+
+        const featureInput = tf.input({ shape: [1280] })
+
+        // Shared intermediate layer
+        const shared = tf.layers
+          .dense({
+            units: 256,
+            activation: 'relu',
+            name: 'shared_layer',
+          })
+          .apply(featureInput)
+
+        // Bounding box head
+        const boxIntermediate = tf.layers
+          .dense({
+            units: 128,
+            activation: 'relu',
+            name: 'box_intermediate',
+          })
+          .apply(shared)
+
+        const boxHead = tf.layers
+          .dense({
+            units: 4,
+            activation: 'sigmoid',
+            name: 'box_head',
+          })
+          .apply(boxIntermediate)
+
+        // Classification head
+        const classIntermediate = tf.layers
+          .dense({
+            units: 128,
+            activation: 'relu',
+            name: 'class_intermediate',
+          })
+          .apply(shared)
+
+        const classHead = tf.layers
+          .dense({
+            units: NUM_CLASSES,
+            activation: null, // No activation - output logits for softmaxCrossEntropy
+            name: 'class_head',
+          })
+          .apply(classIntermediate)
+
+        detectionModel = tf.model({
+          inputs: featureInput,
+          outputs: [boxHead, classHead],
+        })
+
+        // Compile model
+        updateModelLearningRate(currentLearningRate)
+
+        log('Detection model built and compiled', 'success')
+        log(`Model summary: ${detectionModel.countParams()} parameters`, 'info')
+
+        // Show predictions if images are already loaded
+        if (imageDataset.length > 0) {
+          visualizePredictions()
+        }
+      }
+
+      // Update model learning rate
+      function updateModelLearningRate(lr) {
+        if (!detectionModel) return
+        currentLearningRate = lr
+        const optimizer = tf.train.adam(lr)
+        detectionModel.compile({
+          optimizer: optimizer,
+          loss: ['meanSquaredError', 'categoricalCrossentropy'],
+          lossWeights: [1.0, 0.5],
+          metrics: ['accuracy'],
+        })
+      }
+
+      // Load image into dataset
+      async function loadImageIntoDataset(file, index) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = async e => {
+            try {
+              const img = new Image()
+              img.onload = async () => {
+                // Create canvas and resize
+                const canvas = document.createElement('canvas')
+                canvas.width = IMAGE_SIZE
+                canvas.height = IMAGE_SIZE
+                const ctx = canvas.getContext('2d')
+                ctx.drawImage(img, 0, 0, IMAGE_SIZE, IMAGE_SIZE)
+
+                // Convert to tensor and normalize to [-1, 1]
+                const imageData = ctx.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE)
+                const tensor = tf.browser
+                  .fromPixels(imageData)
+                  .toFloat()
+                  .div(127.5)
+                  .sub(1.0)
+                  .expandDims(0)
+
+                // Load or create default target box
+                let box = loadTargetBox(file.name)
+                if (!box) {
+                  // Default: center box covering 50% of image
+                  box = [0.5, 0.5, 0.5, 0.5]
+                }
+                const boxTensor = tf.tensor2d([box], [1, 4])
+
+                // Check if marked as "no object"
+                const isNoObject = loadNoObjectFlag(file.name)
+                // Class: [background=0, object=1] or [background=1, object=0] if no object
+                const classTensor = isNoObject
+                  ? tf.tensor2d([[1, 0]], [1, NUM_CLASSES])
+                  : tf.tensor2d([[0, 1]], [1, NUM_CLASSES])
+
+                const imgData = {
+                  file: file,
+                  name: file.name,
+                  element: img,
+                  tensor: tensor,
+                  box: boxTensor,
+                  class: classTensor,
+                  boxLoss: null,
+                  totalLoss: null,
+                  isNoObject: isNoObject,
+                  features: null, // Cached MobileNet features
+                }
+
+                imageDataset[index] = imgData
+                resolve(imgData)
+              }
+              img.src = e.target.result
+            } catch (error) {
+              reject(error)
+            }
+          }
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+      }
+
+      // Load all images
+      async function loadAllImages() {
+        const files = Array.from(imageInput.files)
+        if (files.length === 0) return
+
+        log(`Loading ${files.length} image(s)...`, 'info')
+        statusDiv.textContent = `Loading ${files.length} image(s)...`
+
+        // Clear any cached features from previous images
+        clearCachedFeatures()
+
+        // Clear the grid initially
+        imagesGrid.innerHTML = ''
+        imageDataset = []
+
+        // Load and display images one by one
+        for (let i = 0; i < files.length; i++) {
+          statusDiv.textContent = `Loading image ${i + 1}/${files.length}: ${files[i].name}...`
+          log(
+            `Loading image ${i + 1}/${files.length}: ${files[i].name}`,
+            'info',
+          )
+
+          await loadImageIntoDataset(files[i], i)
+
+          // Display the image immediately
+          displaySingleImage(i)
+
+          // Show prediction for this image if model is ready
+          if (detectionModel) {
+            await visualizePredictionForImage(i)
+          }
+
+          // Small delay to allow UI to update
+          await new Promise(resolve => setTimeout(resolve, 10))
+        }
+
+        log(`Loaded ${imageDataset.length} image(s)`, 'success')
+        drawBoxBtn.disabled = false
+        startBtn.disabled = false
+        statusDiv.textContent = `Loaded ${imageDataset.length} image(s). Mark target boxes and start training.`
+      }
+
+      // Display a single image in the grid
+      function displaySingleImage(index) {
+        if (index < 0 || index >= imageDataset.length) return
+
+        const imgData = imageDataset[index]
+
+        const item = document.createElement('div')
+        item.className = 'image-item'
+        item.id = `image-item-${index}`
+
+        const nameDiv = document.createElement('div')
+        nameDiv.className = 'image-name'
+        nameDiv.textContent = imgData.name
+
+        // Controls for marking as "no object"
+        const controlsDiv = document.createElement('div')
+        controlsDiv.className = 'image-controls'
+
+        const noObjectLabel = document.createElement('label')
+        noObjectLabel.className = 'no-object-label'
+
+        const noObjectCheckbox = document.createElement('input')
+        noObjectCheckbox.type = 'checkbox'
+        noObjectCheckbox.checked = imgData.isNoObject || false
+        noObjectCheckbox.addEventListener('change', () => {
+          const isNoObject = noObjectCheckbox.checked
+          imgData.isNoObject = isNoObject
+          saveNoObjectFlag(imgData.name, isNoObject)
+
+          // Update class tensor
+          imgData.class.dispose()
+          imgData.class = isNoObject
+            ? tf.tensor2d([[1, 0]], [1, NUM_CLASSES])
+            : tf.tensor2d([[0, 1]], [1, NUM_CLASSES])
+
+          // Update UI
+          if (isNoObject) {
+            item.classList.add('no-object')
+          } else {
+            item.classList.remove('no-object')
+          }
+
+          // Update predictions
+          if (detectionModel) {
+            visualizePredictions()
+          }
+        })
+
+        noObjectLabel.appendChild(noObjectCheckbox)
+        noObjectLabel.appendChild(document.createTextNode('No Object'))
+
+        controlsDiv.appendChild(noObjectLabel)
+
+        // Apply "no object" styling if needed
+        if (imgData.isNoObject) {
+          item.classList.add('no-object')
+        }
+
+        const container = document.createElement('div')
+        container.className = 'canvas-container'
+        container.style.position = 'relative'
+        container.style.width = '100%'
+        container.style.paddingBottom = '100%' // Square aspect ratio
+
+        // Use a fixed size for canvas (will scale to container)
+        const canvasSize = 300
+
+        // Image canvas
+        const imgCanvas = document.createElement('canvas')
+        imgCanvas.className = 'image-canvas'
+        imgCanvas.width = canvasSize
+        imgCanvas.height = canvasSize
+        imgCanvas.style.width = '100%'
+        imgCanvas.style.height = '100%'
+        const imgCtx = imgCanvas.getContext('2d')
+
+        // Draw image scaled to canvas
+        imgCtx.drawImage(imgData.element, 0, 0, canvasSize, canvasSize)
+
+        // Annotation canvas
+        const annotCanvas = document.createElement('canvas')
+        annotCanvas.className = 'annotation-canvas'
+        annotCanvas.width = canvasSize
+        annotCanvas.height = canvasSize
+        annotCanvas.style.width = '100%'
+        annotCanvas.style.height = '100%'
+
+        // Prediction canvas
+        const predCanvas = document.createElement('canvas')
+        predCanvas.className = 'prediction-overlay'
+        predCanvas.width = canvasSize
+        predCanvas.height = canvasSize
+        predCanvas.style.width = '100%'
+        predCanvas.style.height = '100%'
+
+        container.appendChild(imgCanvas)
+        container.appendChild(annotCanvas)
+        container.appendChild(predCanvas)
+
+        item.appendChild(nameDiv)
+        item.appendChild(controlsDiv)
+        item.appendChild(container)
+
+        imagesGrid.appendChild(item)
+
+        // Store canvas references
+        imgData.canvasElements = {
+          imageCanvas: imgCanvas,
+          annotCanvas: annotCanvas,
+          predCanvas: predCanvas,
+          container: container,
+        }
+
+        // Draw target box
+        drawTargetBoxForImage(index)
+
+        // Drawing event listeners
+        annotCanvas.addEventListener('mousedown', e => {
+          if (!isDrawingMode) return
+          isDrawing = true
+          currentDrawingImageIndex = index
+          item.classList.add('active')
+          const rect = annotCanvas.getBoundingClientRect()
+          const scaleX = annotCanvas.width / rect.width
+          const scaleY = annotCanvas.height / rect.height
+          drawStartX = (e.clientX - rect.left) * scaleX
+          drawStartY = (e.clientY - rect.top) * scaleY
+        })
+
+        annotCanvas.addEventListener('mousemove', e => {
+          if (!isDrawing || currentDrawingImageIndex !== index) return
+          const rect = annotCanvas.getBoundingClientRect()
+          const scaleX = annotCanvas.width / rect.width
+          const scaleY = annotCanvas.height / rect.height
+          const currentX = (e.clientX - rect.left) * scaleX
+          const currentY = (e.clientY - rect.top) * scaleY
+
+          const annotCtx = annotCanvas.getContext('2d')
+          annotCtx.clearRect(0, 0, annotCanvas.width, annotCanvas.height)
+          drawTargetBoxForImage(index)
+
+          const x1 = Math.min(drawStartX, currentX)
+          const y1 = Math.min(drawStartY, currentY)
+          const width = Math.abs(currentX - drawStartX)
+          const height = Math.abs(currentY - drawStartY)
+
+          annotCtx.strokeStyle = '#3498db'
+          annotCtx.lineWidth = 2
+          annotCtx.setLineDash([5, 5])
+          annotCtx.strokeRect(x1, y1, width, height)
+          annotCtx.setLineDash([])
+        })
+
+        annotCanvas.addEventListener('mouseup', e => {
+          if (!isDrawing || currentDrawingImageIndex !== index) return
+          isDrawing = false
+
+          const rect = annotCanvas.getBoundingClientRect()
+          const scaleX = annotCanvas.width / rect.width
+          const scaleY = annotCanvas.height / rect.height
+          const endX = (e.clientX - rect.left) * scaleX
+          const endY = (e.clientY - rect.top) * scaleY
+
+          const x1 = Math.min(drawStartX, endX) / canvasSize
+          const y1 = Math.min(drawStartY, endY) / canvasSize
+          const x2 = Math.max(drawStartX, endX) / canvasSize
+          const y2 = Math.max(drawStartY, endY) / canvasSize
+
+          const centerX = (x1 + x2) / 2
+          const centerY = (y1 + y2) / 2
+          const width = x2 - x1
+          const height = y2 - y1
+
+          updateTargetBox(index, centerX, centerY, width, height)
+          item.classList.remove('active')
+          currentDrawingImageIndex = -1
+
+          // Update prediction after drawing new box
+          if (detectionModel) {
+            visualizePredictions()
+          }
+        })
+
+        annotCanvas.addEventListener('mouseleave', () => {
+          if (isDrawing && currentDrawingImageIndex === index) {
+            isDrawing = false
+            item.classList.remove('active')
+            currentDrawingImageIndex = -1
+          }
+        })
+      }
+
+      // Display all images in grid
+      function displayAllImages() {
+        imagesGrid.innerHTML = ''
+
+        imageDataset.forEach((imgData, index) => {
+          displaySingleImage(index)
+        })
+      }
+
+      // Update target box for an image
+      function updateTargetBox(index, centerX, centerY, width, height) {
+        if (index < 0 || index >= imageDataset.length) return
+
+        const imgData = imageDataset[index]
+        imgData.box.dispose()
+        imgData.box = tf.tensor2d([[centerX, centerY, width, height]], [1, 4])
+
+        saveTargetBox(imgData.name, [centerX, centerY, width, height])
+        drawTargetBoxForImage(index)
+        log(`Updated target box for ${imgData.name}`, 'info')
+      }
+
+      // Draw target box on annotation canvas
+      function drawTargetBoxForImage(index) {
+        if (index < 0 || index >= imageDataset.length) return
+
+        const imgData = imageDataset[index]
+        if (!imgData.canvasElements) return
+
+        const { annotCanvas, imageCanvas } = imgData.canvasElements
+        const annotCtx = annotCanvas.getContext('2d')
+
+        annotCtx.clearRect(0, 0, annotCanvas.width, annotCanvas.height)
+
+        imgData.box.array().then(data => {
+          const box = data[0]
+          const centerX = box[0] * imageCanvas.width
+          const centerY = box[1] * imageCanvas.height
+          const width = box[2] * imageCanvas.width
+          const height = box[3] * imageCanvas.height
+          const x1 = centerX - width / 2
+          const y1 = centerY - height / 2
+
+          annotCtx.strokeStyle = '#2ecc71'
+          annotCtx.lineWidth = 3
+          annotCtx.setLineDash([5, 5])
+          annotCtx.strokeRect(x1, y1, width, height)
+          annotCtx.setLineDash([])
+
+          annotCtx.fillStyle = '#2ecc71'
+          annotCtx.fillRect(x1, y1 - 25, 150, 25)
+          annotCtx.fillStyle = 'white'
+          annotCtx.font = '14px Arial'
+          annotCtx.fillText('Target Box', x1 + 5, y1 - 8)
+        })
+      }
+
+      // Visualize prediction for a single image
+      async function visualizePredictionForImage(index) {
+        if (!detectionModel || index < 0 || index >= imageDataset.length) return
+
+        const imgData = imageDataset[index]
+        if (!imgData.canvasElements) return
+
+        const { predCanvas, imageCanvas } = imgData.canvasElements
+        const predCtx = predCanvas.getContext('2d')
+
+        const isGraphModel = featureExtractor && 'execute' in featureExtractor
+
+        try {
+          let features
+          // Use cached features if available, otherwise extract on the fly
+          if (imgData.features) {
+            features = imgData.features.clone()
+          } else {
+            if (isGraphModel) {
+              features = featureExtractor.execute(
+                { 'inputs:0': imgData.tensor },
+                'Identity:0',
+              )
+            } else {
+              features = featureExtractor.predict(imgData.tensor)
+            }
+          }
+
+          const [boxPred, classPredLogits] = detectionModel.predict(features)
+
+          // Apply softmax to logits to get probabilities
+          const classPred = classPredLogits.softmax()
+
+          // Get values - use .data() for better performance
+          const boxData = await boxPred.data()
+          const classData = await classPred.data()
+
+          // Now that we have the new data, clear and draw in one operation
+          // This prevents flickering by keeping old prediction until new one is ready
+          predCtx.clearRect(0, 0, predCanvas.width, predCanvas.height)
+
+          // Box format: [centerX, centerY, width, height] in normalized [0,1]
+          // Use imageCanvas dimensions for scaling (actual rendered size)
+          const centerX = boxData[0] * imageCanvas.width
+          const centerY = boxData[1] * imageCanvas.height
+          const w = boxData[2] * imageCanvas.width
+          const h = boxData[3] * imageCanvas.height
+
+          // Convert center coordinates to top-left
+          const x1 = centerX - w / 2
+          const y1 = centerY - h / 2
+
+          // Draw predicted box with red color (solid line to distinguish from target)
+          predCtx.strokeStyle = '#e74c3c'
+          predCtx.lineWidth = 3
+          predCtx.setLineDash([]) // Solid line for predictions
+          predCtx.strokeRect(x1, y1, w, h)
+
+          // Draw label background
+          const confidence = classData[1] // Object class probability (index 1)
+          const labelWidth = 140
+          predCtx.fillStyle = '#e74c3c'
+          predCtx.fillRect(x1, y1 - 20, labelWidth, 20)
+
+          // Draw label text
+          predCtx.fillStyle = 'white'
+          predCtx.font = 'bold 12px Arial'
+          predCtx.fillText(
+            `Predicted: ${(confidence * 100).toFixed(1)}%`,
+            x1 + 5,
+            y1 - 5,
+          )
+
+          boxPred.dispose()
+          classPred.dispose()
+          classPredLogits.dispose()
+          // Always dispose features (either clone of cached or newly extracted)
+          // The cached features in imgData.features remain untouched
+          features.dispose()
+        } catch (error) {
+          console.error(`Error visualizing for image ${index}:`, error)
+          // Only clear on error, otherwise keep old prediction
+          predCtx.clearRect(0, 0, predCanvas.width, predCanvas.height)
+          // Draw error indicator
+          predCtx.fillStyle = '#e74c3c'
+          predCtx.font = '12px Arial'
+          predCtx.fillText('Prediction Error', 10, 20)
+        }
+      }
+
+      // Visualize predictions on all images
+      async function visualizePredictions() {
+        if (!detectionModel || imageDataset.length === 0) return
+
+        for (let i = 0; i < imageDataset.length; i++) {
+          await visualizePredictionForImage(i)
+        }
+      }
+
+      // Extract and cache features for all images
+      async function extractAndCacheFeatures() {
+        if (!featureExtractor || imageDataset.length === 0) return
+
+        const isGraphModel = featureExtractor && 'execute' in featureExtractor
+        log('Extracting and caching features for all images...', 'info')
+
+        for (const imgData of imageDataset) {
+          // Skip if features already cached
+          if (imgData.features) continue
+
+          let features
+          if (isGraphModel) {
+            features = featureExtractor.execute(
+              { 'inputs:0': imgData.tensor },
+              'Identity:0',
+            )
+          } else {
+            features = featureExtractor.predict(imgData.tensor)
+          }
+
+          // Cache the features
+          imgData.features = features
+        }
+
+        log('Features cached for all images', 'success')
+      }
+
+      // Clear cached features (e.g., when images change)
+      function clearCachedFeatures() {
+        for (const imgData of imageDataset) {
+          if (imgData.features) {
+            imgData.features.dispose()
+            imgData.features = null
+          }
+        }
+      }
+
+      // Training loop - trains on all images
+      async function trainEpoch() {
+        if (!isTraining || !detectionModel || imageDataset.length === 0) return
+
+        try {
+          // Update learning rate if changed
+          const newLearningRate = parseFloat(learningRateInput.value) || 1e-4
+          if (Math.abs(newLearningRate - currentLearningRate) > 1e-7) {
+            updateModelLearningRate(newLearningRate)
+          }
+
+          // Collect all features and targets (use cached features if available)
+          const featuresList = []
+          const boxesList = []
+          const classesList = []
+
+          const isGraphModel = featureExtractor && 'execute' in featureExtractor
+
+          for (const imgData of imageDataset) {
+            // Use cached features if available, otherwise extract on the fly
+            let features
+            if (imgData.features) {
+              // Use cached features (clone to avoid disposal issues)
+              features = imgData.features.clone()
+            } else {
+              // Extract features if not cached (shouldn't happen in normal flow)
+              if (isGraphModel) {
+                features = featureExtractor.execute(
+                  { 'inputs:0': imgData.tensor },
+                  'Identity:0',
+                )
+              } else {
+                features = featureExtractor.predict(imgData.tensor)
+              }
+            }
+
+            featuresList.push(features)
+            boxesList.push(imgData.box)
+            classesList.push(imgData.class)
+          }
+
+          // Concatenate into batch
+          const xs = tf.concat(featuresList, 0)
+          const boxTargets = tf.concat(boxesList, 0)
+          const classTargets = tf.concat(classesList, 0)
+
+          // Create mask for box loss: 0 for "no object" images, 1 for images with objects
+          const boxMask = tf.tensor1d(
+            imageDataset.map(imgData => (imgData.isNoObject ? 0 : 1)),
+          )
+          const boxMaskExpanded = boxMask.expandDims(1) // [batch, 1] to broadcast to [batch, 4]
+
+          // Train on batch with masked box loss
+          const optimizer = detectionModel.optimizer
+          let boxLoss, classLoss, totalLoss
+
+          // Compute loss and gradients with masking
+          // Note: We don't use tf.tidy here because optimizer.minimize needs access to variables
+          // Define cost function that computes masked loss
+          const cost = () => {
+            const [boxPred, classPred] = detectionModel.predict(xs)
+
+            // Compute masked box loss: only penalize when there's an object
+            const boxDiff = boxTargets.sub(boxPred)
+            const boxSquared = boxDiff.square()
+            const maskedBoxLoss = boxSquared.mul(boxMaskExpanded)
+
+            // Compute class loss using softmaxCrossEntropy (expects logits)
+            const classLossTensor = tf.losses.softmaxCrossEntropy(
+              classTargets,
+              classPred,
+            )
+
+            // Total loss with weights
+            return maskedBoxLoss.mean().mul(1.0).add(classLossTensor.mul(0.5))
+          }
+
+          // Get loss values for metrics (before applying gradients)
+          const [boxPred, classPred] = detectionModel.predict(xs)
+          const boxDiff = boxTargets.sub(boxPred)
+          const boxSquared = boxDiff.square()
+          const maskedBoxLoss = boxSquared.mul(boxMaskExpanded)
+          boxLoss = maskedBoxLoss.mean().arraySync()
+
+          const classLossTensor = tf.losses.softmaxCrossEntropy(
+            classTargets,
+            classPred,
+          )
+          classLoss = classLossTensor.arraySync()
+          totalLoss = boxLoss * 1.0 + classLoss * 0.5
+
+          // Apply gradients - omit varList to auto-detect variables from cost function
+          optimizer.minimize(cost)
+
+          // Cleanup tensors
+          boxPred.dispose()
+          classPred.dispose()
+          classLossTensor.dispose()
+          boxMaskExpanded.dispose()
+
+          // Cleanup
+          xs.dispose()
+          boxTargets.dispose()
+          classTargets.dispose()
+          boxMask.dispose()
+          featuresList.forEach(f => f.dispose())
+
+          currentEpoch++
+
+          document.getElementById('epochValue').textContent = currentEpoch
+          document.getElementById('totalLossValue').textContent =
+            totalLoss.toFixed(4)
+          document.getElementById('boxLossValue').textContent =
+            boxLoss.toFixed(4)
+          document.getElementById('classLossValue').textContent =
+            classLoss.toFixed(4)
+
+          statusDiv.textContent = `Epoch ${currentEpoch}: Loss = ${totalLoss.toFixed(4)} (Box: ${boxLoss.toFixed(4)}, Class: ${classLoss.toFixed(4)})`
+
+          // Visualize predictions after each epoch
+          await visualizePredictions()
+
+          // Small delay to allow UI to update
+          await new Promise(resolve => setTimeout(resolve, 10))
+
+          // Continue training
+          if (isTraining) {
+            await trainEpoch()
+          }
+        } catch (error) {
+          log(`Training error: ${error.message}`, 'error')
+          statusDiv.textContent = `Error: ${error.message}`
+          isTraining = false
+          startBtn.disabled = false
+          stopBtn.disabled = true
+          drawBoxBtn.disabled = false
+          learningRateInput.disabled = false
+        }
+      }
+
+      // Event listeners
+      imageInput.addEventListener('change', loadAllImages)
+
+      drawBoxBtn.addEventListener('click', () => {
+        isDrawingMode = !isDrawingMode
+        if (isDrawingMode) {
+          drawBoxBtn.textContent = 'Exit Draw Mode'
+          drawBoxBtn.style.background = '#e74c3c'
+          imagesGrid.classList.add('drawing-mode')
+          statusDiv.textContent =
+            'Draw mode: Click and drag on images to mark target boxes'
+        } else {
+          drawBoxBtn.textContent = 'Draw Target Box'
+          drawBoxBtn.style.background = '#3498db'
+          imagesGrid.classList.remove('drawing-mode')
+          statusDiv.textContent = 'Draw mode exited'
+        }
+      })
+
+      startBtn.addEventListener('click', async () => {
+        if (imageDataset.length === 0) {
+          alert('Please load images first')
+          return
+        }
+
+        // Check if all images have target boxes (except those marked as "no object")
+        const missingBoxes = imageDataset.filter(
+          imgData => !imgData.isNoObject && !loadTargetBox(imgData.name),
+        )
+        if (missingBoxes.length > 0) {
+          alert(
+            `Please mark target boxes for images with objects, or mark them as "No Object". ${missingBoxes.length} image(s) missing boxes.`,
+          )
+          return
+        }
+
+        isTraining = true
+        // Don't reset epoch counter - continue from where we left off
+        startBtn.disabled = true
+        stopBtn.disabled = false
+        drawBoxBtn.disabled = true
+        learningRateInput.disabled = true
+        statusDiv.textContent = `Training started on ${imageDataset.length} image(s)...`
+        log(`Training started on ${imageDataset.length} image(s)`, 'success')
+
+        // Extract and cache features once before training starts
+        await extractAndCacheFeatures()
+
+        // Show initial predictions before training
+        if (detectionModel) {
+          await visualizePredictions()
+        }
+
+        trainEpoch()
+      })
+
+      stopBtn.addEventListener('click', () => {
+        isTraining = false
+        startBtn.disabled = false
+        stopBtn.disabled = true
+        drawBoxBtn.disabled = imageDataset.length === 0
+        learningRateInput.disabled = false
+        statusDiv.textContent = `Training stopped. Processed ${currentEpoch} epochs.`
+        log('Training stopped', 'info')
+      })
+
+      // Toggle image names visibility
+      const showImageNamesToggle = document.getElementById(
+        'showImageNamesToggle',
+      )
+
+      // Function to update visibility based on checkbox state
+      function updateImageNamesVisibility() {
+        if (showImageNamesToggle.checked) {
+          imagesGrid.classList.remove('hide-image-names')
+        } else {
+          imagesGrid.classList.add('hide-image-names')
+        }
+      }
+
+      // Load saved preference from localStorage
+      const savedShowNames = localStorage.getItem('showImageNames')
+      if (savedShowNames !== null) {
+        showImageNamesToggle.checked = savedShowNames === 'true'
+      }
+
+      // Apply initial state
+      updateImageNamesVisibility()
+
+      // Update on change and save preference
+      showImageNamesToggle.addEventListener('change', () => {
+        localStorage.setItem(
+          'showImageNames',
+          showImageNamesToggle.checked.toString(),
+        )
+        updateImageNamesVisibility()
+      })
+
+      // Update image grid columns
+      function updateImageGridColumns(numColumns) {
+        imagesGrid.style.gridTemplateColumns = `repeat(${numColumns}, 1fr)`
+      }
+
+      // Number of columns control
+      const numColumnsInput = document.getElementById('numColumnsInput')
+
+      // Load saved columns from localStorage
+      const savedColumns = localStorage.getItem('imageGridColumns')
+      if (savedColumns) {
+        numColumnsInput.value = savedColumns
+        updateImageGridColumns(parseInt(savedColumns, 10))
+      }
+
+      numColumnsInput.addEventListener('input', () => {
+        const columns = parseInt(numColumnsInput.value, 10) || 5
+        // Clamp to valid range
+        const clampedColumns = Math.max(1, Math.min(10, columns))
+        numColumnsInput.value = clampedColumns
+        localStorage.setItem('imageGridColumns', clampedColumns.toString())
+        updateImageGridColumns(clampedColumns)
+      })
+
+      // Initialize on load
+      window.addEventListener('load', () => {
+        initializeModel()
+        // Check if Firefox preserved file selection
+        if (imageInput.files.length > 0) {
+          loadAllImages()
+        }
+      })
+    </script>
+  </body>
+</html>
