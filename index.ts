@@ -1,3 +1,4 @@
+import './polyfill'
 import * as tfjs from '@tensorflow/tfjs-node'
 export * from './image'
 export * from './image-model'

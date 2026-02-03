@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'fs/promises'
+import './polyfill'
 import * as tf from '@tensorflow/tfjs-node'
 import { toTensor3D } from './tensor'
 import {

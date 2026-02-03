@@ -1,3 +1,4 @@
+import './polyfill'
 import * as tf from '@tensorflow/tfjs-node'
 import { existsSync } from 'fs'
 import { mkdir, readFile, writeFile } from 'fs/promises'
