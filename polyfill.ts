@@ -1,6 +1,6 @@
 // Polyfill the removed util.isNullOrUndefined (Node 23+ broke tfjs-node < ~4.23)
 export function polyfillUtil() {
-  let util = require('util')
+  let util = eval('require("util")')
 
   // Only patch if the function is missing
   if (typeof util.isNullOrUndefined !== 'function') {
@@ -24,4 +24,7 @@ export function polyfillUtil() {
   }
 }
 
-polyfillUtil()
+// only run in node.js
+if (typeof window === 'undefined') {
+  polyfillUtil()
+}
