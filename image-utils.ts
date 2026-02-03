@@ -1,3 +1,4 @@
+import './polyfill'
 import * as tf from '@tensorflow/tfjs-core'
 import { toTensor4D } from './tensor'
 import { Sharp } from 'sharp'

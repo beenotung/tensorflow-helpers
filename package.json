@@ -1,6 +1,6 @@
 {
   "name": "tensorflow-helpers",
-  "version": "1.5.2-cpu",
+  "version": "2.0.0-cpu",
   "description": "Helper functions to use tensorflow in nodejs for transfer learning, image classification, and more",
   "keywords": [
     "tensorflow",

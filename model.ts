@@ -1,3 +1,4 @@
+import './polyfill'
 import * as tf from '@tensorflow/tfjs'
 import sharp, { Sharp } from 'sharp'
 import { existsSync, mkdirSync } from 'fs'

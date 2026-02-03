@@ -1,4 +1,5 @@
 import * as tf from '@tensorflow/tfjs'
+import './polyfill'
 import {
   CropAndResizeAspectRatio,
   cropAndResizeImageSharp,
