@@ -12,15 +12,25 @@ export type ModelWithArtifacts<Model extends object> = Model & {
 }
 
 export function getModelArtifacts<Model extends object>(
-  model: Model,
+  _model: Model,
 ): PatchedModelArtifacts {
-  let artifacts = (model as any).artifacts
-  if (!artifacts) {
-    throw new Error('model artifacts not found in ' + model.constructor.name)
+  let model = _model as any
+  if (model.artifacts) {
+    return model.artifacts
   }
-  return artifacts
+  if (model.userDefinedMetadata) {
+    return model
+  }
+  if (typeof model.getUserDefinedMetadata === 'function') {
+    model.userDefinedMetadata = model.getUserDefinedMetadata()
+    return model
+  }
+  throw new Error('model artifacts not found in ' + model.constructor.name)
 }
 
+/**
+ * wrapper to unify the LayeredModel and GraphModel
+ */
 export function exposeModelArtifacts<Model extends object>(model: Model) {
   // Add methods directly to the original model object
   Object.defineProperty(model, 'getArtifacts', {
