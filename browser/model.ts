@@ -377,6 +377,24 @@ export type ImageOrUrl =
   | HTMLVideoElement
   | ImageBitmap
 
+function loadImage(image_or_url: ImageOrUrl) {
+  if (typeof image_or_url != 'string') {
+    return image_or_url
+  }
+  let url = image_or_url
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    let image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = error =>
+      reject(
+        new Error('failed to load image: ' + JSON.stringify(url), {
+          cause: error,
+        }),
+      )
+    image.src = url
+  })
+}
+
 export async function loadImageModel<Cache extends EmbeddingCache>(options: {
   url: string
   cacheUrl?: string
@@ -402,24 +420,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
   let { width, height, channels } = spec
 
   async function loadImageCropped(image_or_url: ImageOrUrl) {
-    function loadImage() {
-      if (typeof image_or_url != 'string') {
-        return image_or_url
-      }
-      let url = image_or_url
-      return new Promise<HTMLImageElement>((resolve, reject) => {
-        let image = new Image()
-        image.onload = () => resolve(image)
-        image.onerror = error =>
-          reject(
-            new Error('failed to load image: ' + JSON.stringify(url), {
-              cause: error,
-            }),
-          )
-        image.src = url
-      })
-    }
-    let image = await loadImage()
+    let image = await loadImage(image_or_url)
     let imageTensor = tf.browser.fromPixels(image, channels)
     return cropAndResizeImageTensor({
       imageTensor,
