@@ -264,7 +264,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
 
     try {
       let image = sharp(file)
-      embedding = await imageSharpToEmbedding(image)
+      embedding = await imageSharpToEmbedding(image, options)
     } catch (error) {
       throw new Error('failed to load image: ' + JSON.stringify(file), {
         cause: error,
@@ -296,12 +296,18 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
     })
   }
 
-  async function imageSharpToEmbedding(image: Sharp): Promise<tf.Tensor> {
+  async function imageSharpToEmbedding(
+    image: Sharp,
+    options?: ImageEmbeddingOptions,
+  ): Promise<tf.Tensor> {
     image = cropAndResizeImageSharp({ image, width, height, aspectRatio })
     let imageTensor = await imageSharpToTensor(image)
     let embedding = tf.tidy(() => {
       let outputs = model.predict(imageTensor)
       let embedding = toOneTensor(outputs)
+      if (options?.squeeze) {
+        embedding = tf.squeeze(embedding, [0])
+      }
       return embedding
     })
     imageTensor.dispose()
