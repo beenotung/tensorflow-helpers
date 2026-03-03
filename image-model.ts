@@ -3,6 +3,7 @@ export type ImageModelSpec = {
   width: number
   height: number
   channels: number
+  input_range: [min: number, max: number]
   features: number
   spatial_features?: SpatialFeatures
   spatial_layers?: SpatialLayer[]
@@ -29,6 +30,7 @@ export const PreTrainedImageModels = {
       width: 224 as const,
       height: 224 as const,
       channels: 3 as const,
+      input_range: [0, 1] as const,
       features: 1280 as const,
       spatial_features: [1, 7, 7, 160] as const satisfies SpatialFeatures,
       spatial_layers: [
@@ -64,6 +66,7 @@ export const PreTrainedImageModels = {
       width: 224 as const,
       height: 224 as const,
       channels: 3 as const,
+      input_range: [0, 1] as const,
       features: 1280 as const,
       spatial_features: [1, 7, 7, 120] as const satisfies SpatialFeatures,
       spatial_layers: [
@@ -99,6 +102,7 @@ export const PreTrainedImageModels = {
       width: 224 as const,
       height: 224 as const,
       channels: 3 as const,
+      input_range: [0, 1] as const,
       features: 1280 as const,
       spatial_features: [1, 7, 7, 96] as const satisfies SpatialFeatures,
       spatial_layers: [
@@ -129,6 +133,7 @@ export const PreTrainedImageModels = {
       width: 224 as const,
       height: 224 as const,
       channels: 3 as const,
+      input_range: [0, 1] as const,
       features: 1280 as const,
       spatial_features: [1, 7, 7, 72] as const satisfies SpatialFeatures,
       spatial_layers: [

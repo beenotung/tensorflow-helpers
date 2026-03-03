@@ -162,7 +162,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
   cache?: Cache | boolean
 }) {
   let { spec, dir, aspectRatio, cache } = options
-  let { url, width, height, channels } = spec
+  let { url, width, height, channels, input_range } = spec
 
   let model = await cachedLoadGraphModel({
     url,
@@ -273,6 +273,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
         height,
         aspectRatio,
       })
+      if
       let embedding = model.predict(imageTensor) as tf.Tensor
       if (options?.squeeze) {
         embedding = tf.squeeze(embedding, [0])

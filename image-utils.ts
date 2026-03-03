@@ -67,14 +67,19 @@ export function calcCropBox(options: {
  */
 export type CropAndResizeAspectRatio = 'rescale' | 'center-crop'
 
+/**
+ * @description only doing crop and resize
+ * - do not auto dispose imageTensor
+ * - do not scale the pixel values
+ */
 export function cropAndResizeImageTensor(options: {
   imageTensor: ImageTensor
   width: number
   height: number
   aspectRatio?: CropAndResizeAspectRatio
 }): tf.Tensor4D & tf.Tensor {
-  let { imageTensor, width, height } = options
-  let croppedImageTensor = tf.tidy(() => {
+  return tf.tidy(() => {
+    let { imageTensor, width, height } = options
     let imageShape = getImageTensorShape(imageTensor)
     let cropBox: Box =
       options.aspectRatio != 'center-crop'
@@ -90,8 +95,40 @@ export function cropAndResizeImageTensor(options: {
       [0],
       [height, width],
     )
-    return crop.div<tf.Tensor4D>(255)
+    return crop
   })
-  imageTensor.dispose()
-  return croppedImageTensor
+}
+
+/**
+ * @example
+ * - [0, 255] -> [0, 1]
+ * - [0, 255] -> [-1, 1]
+ * - [0, 1] -> [0, 255]
+ */
+export function scaleTensor(options: {
+  tensor: tf.Tensor4D
+  fromRange: [min: number, max: number]
+  toRange: [min: number, max: number]
+}): tf.Tensor4D {
+  let { tensor, fromRange, toRange } = options
+
+  // skip mapping if the original range is the same as the target range
+  if (fromRange[0] === toRange[0] && fromRange[1] === toRange[1]) {
+    return tensor
+  }
+
+  let [fromMin, fromMax] = fromRange
+  let fromRange = fromMax - fromMin
+  let [toMin, toMax] = toRange
+
+  // (x - from_min) / from_range * to_range + to_min
+  if (fromMin != 0) {
+    tensor = tensor.sub(fromMin)
+  }
+
+  return tensor
+    .sub<tf.Tensor4D>(fromMin)
+    .div<tf.Tensor4D>(fromMax - fromMin)
+    .mul<tf.Tensor4D>(toMax - toMin)
+    .add<tf.Tensor4D>(toMin)
 }

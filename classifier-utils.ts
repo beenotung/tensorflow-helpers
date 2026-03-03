@@ -106,13 +106,84 @@ export function mapWithClassName(
   return result
 }
 
-export function calcClassWeight(options: {
+export let calcClassWeight = calcInverseFrequencyClassWeight
+
+export function calcInverseFrequencyClassWeight(options: {
   classes: number
   classCounts: number[]
 }) {
-  let total = options.classCounts.reduce((acc, c) => acc + c, 0)
-  let classWeights = options.classCounts.map(
-    count => total / options.classes / count,
-  )
+  const { classes, classCounts } = options
+
+  if (classCounts.length !== classes) {
+    throw new Error(
+      `classCounts length (${classCounts.length}) must match classes (${classes})`,
+    )
+  }
+
+  const total = classCounts.reduce((acc, c) => acc + c, 0)
+
+  if (total === 0) {
+    throw new Error('classCounts cannot be all zero')
+  }
+
+  const classWeights = classCounts.map(count => {
+    if (count <= 0) {
+      throw new Error(`class count must be positive, got ${count}`)
+    }
+    return total / classes / count
+  })
+
   return classWeights
+}
+
+export function calcEffectiveClassWeight(options: {
+  classCounts: number[]
+  beta?: number // e.g. 0.9999
+}) {
+  const { beta = 0.9999 } = options
+  const n = options.classCounts.length
+  const weights = new Array(n)
+
+  // calculate the effective class weight (inverse frequency based on effective sample size)
+  for (let i = 0; i < n; i++) {
+    const count = options.classCounts[i]
+    const effective = (1 - Math.pow(beta, count)) / (1 - beta)
+    weights[i] = 1 / effective
+  }
+
+  // find the median weight
+  const sortedWeights = weights.sort((a, b) => a - b)
+  let mid = Math.floor(n / 2)
+  if (n % 2 === 0) {
+    mid = (sortedWeights[mid] + sortedWeights[mid + 1]) / 2
+  } else {
+    mid = sortedWeights[mid]
+  }
+
+  // normalize the weights by the median weight
+  for (let i = 0; i < n; i++) {
+    weights[i] = weights[i] / mid
+  }
+
+  return weights
+}
+
+async function main() {
+  let classCounts = [50, 70, 30, 1000]
+  let weights = calcEffectiveClassWeight({
+    classCounts,
+  })
+  console.log('classCounts:', classCounts)
+  console.log('weights:', weights)
+  let total_samples = classCounts.reduce((acc, c) => acc + c, 0)
+  console.log(
+    'average weight:',
+    weights.reduce((acc, w, i) => acc + w * classCounts[i], 0) / total_samples,
+  )
+}
+if (require.main === module) {
+  main().catch(error => {
+    console.error(error)
+    process.exit(1)
+  })
 }

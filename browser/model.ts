@@ -9,6 +9,7 @@ import {
   CropAndResizeAspectRatio,
   ImageTensor,
   cropAndResizeImageTensor,
+  scaleTensor,
 } from '../image-utils'
 import { ImageModelSpec, SpatialFeatures } from '../image-model'
 import { getClassCount } from '../classifier-utils'
@@ -418,15 +419,24 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
       })
   let spec = getModelSpec(options.url, model)
   let { width, height, channels } = spec
+  let input_range = spec.input_range ?? [0, 1]
 
   async function loadImageCropped(image_or_url: ImageOrUrl) {
     let image = await loadImage(image_or_url)
-    let imageTensor = tf.browser.fromPixels(image, channels)
-    return cropAndResizeImageTensor({
-      imageTensor,
-      width,
-      height,
-      aspectRatio,
+    return tf.tidy(() => {
+      let imageTensor = tf.browser.fromPixels(image, channels)
+      let croppedImageTensor = cropAndResizeImageTensor({
+        imageTensor,
+        width,
+        height,
+        aspectRatio,
+      })
+      let scaled = scaleTensor({
+        tensor: croppedImageTensor,
+        fromRange: [0, 255],
+        toRange: input_range,
+      })
+      return scaled
     })
   }
 
@@ -517,6 +527,7 @@ export async function loadImageModel<Cache extends EmbeddingCache>(options: {
         imageTensor,
         width,
         height,
+        range: spec.range,
         aspectRatio,
       })
       let embedding = model.predict(inputTensor) as tf.Tensor
