@@ -23,7 +23,7 @@ export async function loadImageClassifierModel(options: {
   baseModel: ImageModel
   hiddenLayers?: number[]
   modelDir: string
-  datasetDir: string
+  datasetDir?: string
   /** @description if not provided, will be auto scanned from datasetDir or load from the model.json */
   classNames?: string[]
 }) {
@@ -35,15 +35,21 @@ export async function loadImageClassifierModel(options: {
         embeddingFeatures: baseModel.spec.features,
         hiddenLayers: options.hiddenLayers,
         get classes() {
+          if (!classNames && !datasetDir) {
+            throw new Error('classNames or datasetDir must be provided')
+          }
           if (!classNames) {
-            return getClassesFromDatasetDir(datasetDir).length
+            classNames = getClassesFromDatasetDir(datasetDir!)
           }
           return classNames.length
         },
         classNames,
       })
   classNames = classifierModel.classNames || classNames
-  if (!classNames && existsSync(datasetDir)) {
+  if (!classNames && !datasetDir) {
+    throw new Error('classNames or datasetDir must be provided')
+  }
+  if (!classNames && datasetDir && existsSync(datasetDir)) {
     classNames = getClassesFromDatasetDir(datasetDir)
   }
   if (!classNames) {
@@ -112,6 +118,9 @@ export async function loadImageClassifierModel(options: {
   }
 
   async function loadDatasetFromDirectory() {
+    if (!datasetDir) {
+      throw new Error('datasetDir not provided')
+    }
     let xs: tf.Tensor[] = []
     let classIndices: number[] = []
     let classCounts: number[] = new Array(classCount).fill(0)
