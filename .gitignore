@@ -12,7 +12,7 @@ dataset/
 samples/
 saved_model/
 saved_models/
-image.jpg
+images/*.jpg
 bundle.js
 *.bundle.js
 data.json

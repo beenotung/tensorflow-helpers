@@ -1,5 +1,7 @@
+import { readdirSync } from 'fs'
 import { loadImageClassifierModel, topClassifyResult } from './classifier'
 import { PreTrainedImageModels, loadImageModel } from './model'
+import { join } from 'path'
 
 async function main() {
   let baseModel = await loadImageModel({
@@ -28,11 +30,17 @@ async function main() {
 
   await classifier.save()
 
-  let classes = await classifier.classifyImageFile('image.jpg')
-  let topClass = topClassifyResult(classes)
-
-  console.log('classes:', classes)
-  console.log('top result:', topClass)
-  // [print] result: { label: 'anime', confidence: 0.7991582155227661 }
+  let dir = 'images'
+  for (let filename of readdirSync(dir)) {
+    console.log('-'.repeat(32))
+    let file = join(dir, filename)
+    let classes = await classifier.classifyImageFile(file)
+    let topClass = topClassifyResult(classes)
+    console.log('file:', file)
+    console.log('classes:', classes)
+    console.log('top result:', topClass)
+    // [print] result: { label: 'anime', confidence: 0.7991582155227661 }
+    console.log('-'.repeat(32))
+  }
 }
 main().catch(e => console.error(e))
