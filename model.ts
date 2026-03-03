@@ -79,6 +79,22 @@ export async function saveModel(options: {
   })
 }
 
+let fetchForFile: typeof fetch = async function fetchForFile(
+  url,
+): Promise<Response> {
+  let file = url as string
+  file = file.replace('file://', '')
+  // console.log('reading file:', file)
+  let buffer = await readFile(file)
+  return new Response(buffer, {
+    headers: {
+      'Content-Type': file.endsWith('.json')
+        ? 'application/json'
+        : 'application/octet-stream',
+    },
+  })
+}
+
 export async function loadGraphModel(options: {
   dir: string
   classNames?: string[]
@@ -91,7 +107,9 @@ export async function loadGraphModel(options: {
   if (changed) {
     await writeFile(join(dir, 'model.json'), JSON.stringify(modelArtifact))
   }
-  let model = await tf.loadGraphModel('file://' + join(dir, 'model.json'))
+  let model = await tf.loadGraphModel('file://' + join(dir, 'model.json'), {
+    fetchFunc: fetchForFile,
+  })
   return attachClassNames(model, classNames)
 }
 
@@ -107,7 +125,9 @@ export async function loadLayersModel(options: {
   if (changed) {
     await writeFile(join(dir, 'model.json'), JSON.stringify(modelArtifact))
   }
-  let model = await tf.loadLayersModel('file://' + join(dir, 'model.json'))
+  let model = await tf.loadLayersModel('file://' + join(dir, 'model.json'), {
+    fetchFunc: fetchForFile,
+  })
   if (classNames) {
     let classCount = getClassCount(model.outputShape)
     if (classCount != classNames.length) {
